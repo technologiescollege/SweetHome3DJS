@@ -87,6 +87,8 @@ export class UserPreferences {
     this.homeExamples = [];
 
     this.ignoredActionTips = {};
+    /** @type {"light"|"dark"|"system"} */
+    this.uiTheme = "system";
   }
 
   /**
@@ -558,6 +560,29 @@ export class UserPreferences {
       this.observerCameraSelectedAtChange = observerCameraSelectedAtChange;
       this.propertyChangeSupport.firePropertyChange("OBSERVER_CAMERA_SELECTED_AT_CHANGE",
         !observerCameraSelectedAtChange, observerCameraSelectedAtChange);
+    }
+  }
+
+  /**
+   * Returns UI theme preference: <code>light</code>, <code>dark</code> or <code>system</code>.
+   * @return {"light"|"dark"|"system"}
+   */
+  getUiTheme() {
+    return this.uiTheme || "system";
+  }
+
+  /**
+   * Sets UI theme preference and notifies listeners.
+   * @param {"light"|"dark"|"system"} uiTheme
+   */
+  setUiTheme(uiTheme) {
+    const next = uiTheme === "light" || uiTheme === "dark" || uiTheme === "system"
+      ? uiTheme
+      : "system";
+    if (this.uiTheme !== next) {
+      const old = this.uiTheme;
+      this.uiTheme = next;
+      this.propertyChangeSupport.firePropertyChange("UI_THEME", old, next);
     }
   }
 

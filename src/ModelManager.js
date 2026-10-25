@@ -583,14 +583,7 @@ export class ModelManager {
     let contentUrl = content.getURL();
     if (!this.modelLoaders) {
       // As model loaders are reentrant, use the same loaders for multiple loading
-      this.modelLoaders = [new OBJLoader()];
-      // Optional loaders
-      if (typeof DAELoader !== "undefined") {
-        this.modelLoaders.push(new DAELoader());
-      }
-      if (typeof Max3DSLoader !== "undefined") {
-        this.modelLoaders.push(new Max3DSLoader());
-      }
+      this.modelLoaders = [new OBJLoader(), new DAELoader(), new Max3DSLoader()];
     }
     let modelManager = this;
     let modelLoadingObserver = {

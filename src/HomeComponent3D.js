@@ -48,6 +48,7 @@ import { HTMLCanvas3D } from './HTMLCanvas3D';
 import { PlanComponent } from './PlanComponent';
 import { KeyStroke } from './core';
 import { TextureManager } from './TextureManager';
+import { ModelManager } from './ModelManager';
 import { Polyline3D } from './Polyline3D';
 import { OperatingSystem } from './URLContent';
 import { ZIPTools } from './URLContent';
@@ -2127,9 +2128,7 @@ export class HomeComponent3D {
       this.groundChangeListener = ev => { }; // Dummy listener
       return structureGroup;
     } else {
-      let ground3D = typeof Ground3D !== "undefined"
-        ? new Ground3D(this.home, groundOriginX, groundOriginY, groundWidth, groundDepth, waitForLoading)
-        : new Box3D(1E7, 0, 1E7, new Appearance3D());
+      let ground3D = new Ground3D(this.home, groundOriginX, groundOriginY, groundWidth, groundDepth, waitForLoading);
       let translation = mat4.create();
       mat4.translate(translation, translation, vec3.fromValues(0, -0.2, 0));
       let transformGroup = new TransformGroup3D(translation);

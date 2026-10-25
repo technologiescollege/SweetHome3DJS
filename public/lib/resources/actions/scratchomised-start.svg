@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <title>scratchomised-start</title>
+  <!-- House (idle / start) -->
+  <path d="M1 7.2 L8 1.6 L15 7.2 V14.2 H1 Z" fill="#FFFFFF" stroke="#333333" stroke-width="1.1" stroke-linejoin="round"/>
+  <rect x="6.5" y="9.6" width="3" height="4.6" fill="#FFFFFF" stroke="#333333" stroke-width="0.9"/>
+  <!-- Large green play badge -->
+  <circle cx="11.2" cy="11.2" r="4.35" fill="#2E7D32" stroke="#FFFFFF" stroke-width="1"/>
+  <path d="M9.7 9.1 L9.7 13.3 L13.3 11.2 Z" fill="#FFFFFF"/>
+</svg>

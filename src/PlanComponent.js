@@ -484,14 +484,6 @@ export class PlanComponent {
   }
 
   /**
-   * Indicator types that may be displayed on selected items.
-   * @constructor
-   */
-  static IndicatorType(name) {
-    this.name = name;
-  }
-
-  /**
    * Returns the HTML element used to view this component at screen.
    */
   getHTMLElement() {
@@ -849,17 +841,6 @@ export class PlanComponent {
     preferences.addPropertyChangeListener("FURNITURE_MODEL_ICON_SIZE", this.preferencesListener);
     preferences.addPropertyChangeListener("ROOM_FLOOR_COLORED_OR_TEXTURED", this.preferencesListener);
     preferences.addPropertyChangeListener("WALL_PATTERN", this.preferencesListener);
-  }
-
-  /**
-   * Preferences property listener bound to this component with a weak reference to avoid
-   * strong link between preferences and this component.
-   * @param {PlanComponent} planComponent
-   * @constructor
-   * @private
-   */
-  static UserPreferencesChangeListener(planComponent) {
-    this.planComponent = planComponent;
   }
 
   /**
@@ -6519,18 +6500,22 @@ PlanComponent.ActionType[PlanComponent.ActionType["ACTIVATE_EDITIION"] = 16] = "
 PlanComponent.ActionType[PlanComponent.ActionType["DEACTIVATE_EDITIION"] = 17] = "DEACTIVATE_EDITIION";
 
 class IndicatorType {
+  constructor(name) {
+    this._name = name;
+  }
+
   /**
    * @return {string}
    */
   name() {
-    return this.name;
+    return this._name;
   }
 
   /**
    * @return {string}
    */
   toString() {
-    return this.name;
+    return this._name;
   }
 }
 
@@ -6548,6 +6533,10 @@ PlanComponent.IndicatorType.ROTATE_ROLL = new PlanComponent.IndicatorType("ROTAT
 PlanComponent.IndicatorType.ARC_EXTENT = new PlanComponent.IndicatorType("ARC_EXTENT");
 
 class UserPreferencesChangeListener {
+  constructor(planComponent) {
+    this.planComponent = planComponent;
+  }
+
   propertyChange(ev) {
     let planComponent = this.planComponent;
     let preferences = ev.getSource();

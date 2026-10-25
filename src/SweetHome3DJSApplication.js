@@ -31,6 +31,19 @@ import { IncrementalHomeRecorder } from './IncrementalHomeRecorder';
 import { RecordedUserPreferences, DefaultUserPreferences } from './UserPreferences';
 import { JSDialog, } from './toolkit';
 import { ResourceAction } from './ResourceAction';
+import { HomeURLContent, ZIPTools } from './URLContent';
+import {
+  ensureSh3xFileName,
+  formatHomeOpenError,
+  isValidSaveAsFileName,
+} from './LocalFileHelpers';
+import {
+  supportsFileSystemAccess,
+  pickHomeFileToOpen,
+  pickHomeFileToSave,
+  writeBlobToFileHandle,
+  downloadBlob,
+} from './LocalFileAccess';
 
 /**
  * Creates a home controller handling savings for local files.
@@ -71,47 +84,123 @@ export class LocalFileHomeController extends HomeController {
   }
 
   /**
-   * Opens a home chosen by the user.
+   * Opens a home from a local File (.sh3d / .sh3x). Used by the file picker and drag-and-drop.
+   * @param {File} file
+   * @param {FileSystemFileHandle} [fileHandle] handle FSA pour réécrire le même fichier au Save
+   */
+  openFromFile(file, fileHandle) {
+    if (file == null) {
+      return;
+    }
+    const controller = this;
+    const preferences = controller.application.getUserPreferences();
+    let cancelled = false;
+    let finished = false;
+    const openingTaskDialog = new JSDialog(preferences,
+      preferences.getLocalizedString("ThreadedTaskPanel", "threadedTask.title"),
+      preferences.getLocalizedString("HomeController", "openMessage"),
+      {
+        size: "small",
+        disposer: function () {
+          if (!finished) {
+            cancelled = true;
+          }
+        }
+      });
+    const cancelBtn = openingTaskDialog.findElement(".dialog-cancel-button");
+    if (cancelBtn) {
+      cancelBtn.innerHTML =
+        ResourceAction.getLocalizedLabelText(preferences, "ThreadedTaskPanel", "cancelButton.text");
+    }
+    openingTaskDialog.displayView();
+
+    const homeName = file.name.indexOf("/") >= 0
+      ? file.name.substring(file.name.lastIndexOf("/") + 1)
+      : file.name;
+    setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+      const objectUrl = URL.createObjectURL(file);
+      controller.application.getHomeRecorder().readHome(objectUrl, {
+        homeLoaded: function (home) {
+          if (cancelled) {
+            ZIPTools.disposeZIP(objectUrl);
+            URL.revokeObjectURL(objectUrl);
+            return;
+          }
+          finished = true;
+          home.setName(homeName);
+          if (fileHandle != null) {
+            home.localFileHandle = fileHandle;
+          }
+          controller.close();
+          openingTaskDialog.close();
+          // Révoquer le blob dès que plus aucun HomeURLContent ne le référence
+          // (contenus déjà extraits vers IndexedDB) ; sinon le garder jusqu'à close().
+          const stillLinked = [];
+          controller.application.getHomeRecorder().searchContents(
+            home, [], stillLinked,
+            (content) => content instanceof HomeURLContent
+              && content.getURL().indexOf(objectUrl) >= 0);
+          if (stillLinked.length === 0) {
+            ZIPTools.disposeZIP(objectUrl);
+            URL.revokeObjectURL(objectUrl);
+          } else {
+            home.localFileObjectUrl = objectUrl;
+          }
+          controller.application.addHome(home);
+        },
+        homeError: function (error) {
+          ZIPTools.disposeZIP(objectUrl);
+          URL.revokeObjectURL(objectUrl);
+          if (cancelled) {
+            return;
+          }
+          finished = true;
+          openingTaskDialog.close();
+          const detail = formatHomeOpenError(error);
+          console.error("Open home error:", error);
+          const title = preferences.getLocalizedString("HomePane", "error.title");
+          const body = preferences.getLocalizedString("HomeController", "openError", homeName)
+            + "<br><pre style='white-space:pre-wrap;max-height:12em;overflow:auto;font-size:12px'>"
+            + detail.replace(/</g, "&lt;")
+            + "</pre>";
+          new JSDialog(preferences, title, body, { size: "medium" }).displayView();
+        }
+      });
+    }, 100);
+  }
+
+  /**
+   * Opens a home chosen by the user from a local .sh3d / .sh3x file.
    */
   open() {
     const controller = this;
-    const openHome = function (homeName) {
-      const preferences = this.application.getUserPreferences();
-      const openingTaskDialog = new JSDialog(preferences,
-        preferences.getLocalizedString("ThreadedTaskPanel", "threadedTask.title"),
-        preferences.getLocalizedString("HomeController", "openMessage"), { size: "small" });
-      openingTaskDialog.findElement(".dialog-cancel-button").style = "display: none";
-
+    const openWithInput = () => {
       const fileInput = document.createElement("input");
       fileInput.setAttribute("style", "display: none");
       fileInput.setAttribute("type", "file");
+      fileInput.setAttribute("accept", ".sh3d,.sh3x,application/zip");
       document.body.appendChild(fileInput);
-      fileInput.addEventListener("change", function (ev) {
+      fileInput.addEventListener("change", function () {
         document.body.removeChild(fileInput);
         if (this.files[0]) {
-          openingTaskDialog.displayView();
-          const file = this.files[0];
-          setTimeout(() => {
-            const homeName = file.name.substring(file.name.indexOf("/") + 1);
-            controller.application.getHomeRecorder().readHome(URL.createObjectURL(file), {
-              homeLoaded: function (home) {
-                // Do not set home name because file name may have been altered automatically by browser when saved
-                controller.close();
-                openingTaskDialog.close();
-                controller.application.addHome(home);
-              },
-              homeError: function (error) {
-                openingTaskDialog.close();
-                const message = preferences.
-                  getLocalizedString("HomeController", "openError", homeName) + "\n" + error;
-                console.log(error);
-                alert(message);
-              }
-            });
-          }, 100);
+          controller.openFromFile(this.files[0]);
         }
       });
       fileInput.click();
+    };
+    const openHome = () => {
+      if (supportsFileSystemAccess()) {
+        pickHomeFileToOpen().then((picked) => {
+          if (picked != null) {
+            controller.openFromFile(picked.file, picked.handle);
+          }
+        }).catch(() => openWithInput());
+      } else {
+        openWithInput();
+      }
     };
 
     if (this.home.isModified() || this.home.isRecovered()) {
@@ -129,6 +218,86 @@ export class LocalFileHomeController extends HomeController {
   }
 
   /**
+   * Opens a dropped local file after optional save confirmation.
+   * @param {File} file
+   */
+  openDroppedFile(file) {
+    if (file == null) {
+      return;
+    }
+    const controller = this;
+    const proceed = () => controller.openFromFile(file);
+    if (this.home.isModified() || this.home.isRecovered()) {
+      this.getView().confirmSave(
+        this.application.configuration === undefined
+          || this.home.getName() !== this.application.configuration.defaultHomeName
+          ? this.home.getName()
+          : null,
+        (save) => {
+          if (save) {
+            controller.save(proceed);
+          } else {
+            proceed();
+          }
+        });
+    } else {
+      proceed();
+    }
+  }
+
+  /**
+   * Écrit le blob sur le disque (handle FSA si possible, sinon téléchargement).
+   * @param {Home} home
+   * @param {Blob} blob
+   * @param {string} homeName
+   * @param {function} [postSaveTask]
+   * @param {JSDialog} [savingTaskDialog]
+   * @private
+   */
+  #deliverSavedBlob(home, blob, homeName, postSaveTask, savingTaskDialog) {
+    const preferences = this.application.getUserPreferences();
+    const finishOk = () => {
+      home.setModified(false);
+      home.setRecovered(false);
+      if (postSaveTask !== undefined) {
+        postSaveTask();
+      }
+    };
+    const fail = (error) => {
+      console.error("Save deliver error:", error);
+      new JSDialog(preferences,
+        preferences.getLocalizedString("HomePane", "error.title"),
+        preferences.getLocalizedString("HomeController", "saveError", homeName,
+          formatHomeOpenError(error).replace(/</g, "&lt;")),
+        { size: "small" }).displayView();
+    };
+
+    const handle = home.localFileHandle;
+    if (handle != null) {
+      writeBlobToFileHandle(handle, blob).then(() => {
+        finishOk();
+      }).catch((ex) => {
+        // Permission perdue / handle invalide → téléchargement
+        console.warn("FSA write failed, fallback download:", ex);
+        home.localFileHandle = null;
+        try {
+          downloadBlob(blob, homeName);
+          finishOk();
+        } catch (ex2) {
+          fail(ex2);
+        }
+      });
+      return;
+    }
+    try {
+      downloadBlob(blob, homeName);
+      finishOk();
+    } catch (ex) {
+      fail(ex);
+    }
+  }
+
+  /**
    * Saves the home managed by this controller. If home name doesn't exist,
    * this method will act as {@link #saveAs() saveAs} method.
    * @param {function} [postSaveTask]
@@ -136,6 +305,9 @@ export class LocalFileHomeController extends HomeController {
   save(postSaveTask) {
     if (this.home.getName() == null
       || (this.application.configuration !== undefined && this.home.getName() === this.application.configuration.defaultHomeName)) {
+      this.saveAs(postSaveTask);
+    } else if (this.home.localFileHandle == null && supportsFileSystemAccess()) {
+      // Première sauvegarde sans handle : proposer un fichier cible (évite N téléchargements)
       this.saveAs(postSaveTask);
     } else {
       const preferences = this.application.getUserPreferences();
@@ -161,35 +333,20 @@ export class LocalFileHomeController extends HomeController {
       const controller = this;
       const homeExtension = this.application.getUserPreferences().getLocalizedString("FileContentManager", "homeExtension");   // .sh3d
       const homeExtension2 = this.application.getUserPreferences().getLocalizedString("FileContentManager", "homeExtension2"); // .sh3x
-      const homeName = controller.home.getName().replace(homeExtension, homeExtension2);
+      const homeName = ensureSh3xFileName(controller.home.getName(), homeExtension, homeExtension2);
+      if (homeName !== controller.home.getName()) {
+        controller.home.setName(homeName);
+      }
       setTimeout(() => {
         savingTaskDialog.writingOperation = controller.application.getHomeRecorder().writeHome(controller.home, homeName, {
           homeSaved: function (home, blob) {
             delete savingTaskDialog.writingOperation;
             savingTaskDialog.close();
-            if (navigator.msSaveOrOpenBlob !== undefined) {
-              navigator.msSaveOrOpenBlob(blob, homeName);
-            } else {
-              const downloadLink = document.createElement('a');
-              downloadLink.setAttribute("style", "display: none");
-              downloadLink.setAttribute("href", URL.createObjectURL(blob));
-              downloadLink.setAttribute("download", homeName);
-              document.body.appendChild(downloadLink);
-              downloadLink.click();
-              setTimeout(() => {
-                document.body.removeChild(downloadLink);
-                URL.revokeObjectURL(downloadLink.getAttribute("href"));
-              }, 500);
-            }
-            home.setModified(false);
-            home.setRecovered(false);
-            if (postSaveTask !== undefined) {
-              postSaveTask();
-            }
+            controller.#deliverSavedBlob(home, blob, homeName, postSaveTask, savingTaskDialog);
           },
           homeError: function (status, error) {
             savingTaskDialog.close();
-            console.log(status + " " + error);
+            console.error(status, error);
             new JSDialog(preferences,
               preferences.getLocalizedString("HomePane", "error.title"),
               preferences.getLocalizedString("HomeController", "saveError", homeName, status + "<br>" + error),
@@ -206,12 +363,125 @@ export class LocalFileHomeController extends HomeController {
    */
   saveAs(postSaveTask) {
     const preferences = this.application.getUserPreferences();
-    const message = preferences.getLocalizedString("AppletContentManager", "showSaveDialog.message");
-    const homeName = prompt(message);
-    if (homeName != null && homeName.length > 0) {
-      const homeExtension2 = this.application.getUserPreferences().getLocalizedString("FileContentManager", "homeExtension2"); // .sh3x
-      this.home.setName(homeName + (homeName.indexOf('.') < 0 ? homeExtension2 : ""));
-      this.save(postSaveTask);
+    const controller = this;
+    const homeExtension = preferences.getLocalizedString("FileContentManager", "homeExtension");   // .sh3d
+    const homeExtension2 = preferences.getLocalizedString("FileContentManager", "homeExtension2"); // .sh3x
+    const defaultBase = (this.application.configuration && this.application.configuration.defaultHomeName)
+      || "Home";
+    const suggested = (this.home.getName()
+      && this.application.configuration
+      && this.home.getName() !== this.application.configuration.defaultHomeName)
+      ? ensureSh3xFileName(this.home.getName(), homeExtension, homeExtension2)
+      : ensureSh3xFileName(defaultBase, homeExtension, homeExtension2);
+
+    const startWrite = (homeName, fileHandle) => {
+      controller.home.setName(homeName);
+      if (fileHandle != null) {
+        controller.home.localFileHandle = fileHandle;
+      }
+      // Évite la boucle save → saveAs quand le handle vient d'être choisi
+      const preferencesInner = controller.application.getUserPreferences();
+      const savingTaskDialog = new JSDialog(preferencesInner,
+        preferencesInner.getLocalizedString("ThreadedTaskPanel", "threadedTask.title"),
+        preferencesInner.getLocalizedString("HomeController", "saveMessage"),
+        {
+          size: "small",
+          disposer: function (dialog) {
+            if (dialog.writingOperation !== undefined) {
+              dialog.writingOperation.abort();
+            }
+          }
+        });
+      if (controller.application.getHomeRecorder().configuration
+        && controller.application.getHomeRecorder().configuration.writeHomeWithWorker) {
+        savingTaskDialog.findElement(".dialog-cancel-button").innerHTML =
+          ResourceAction.getLocalizedLabelText(preferencesInner, "ThreadedTaskPanel", "cancelButton.text");
+      } else {
+        savingTaskDialog.findElement(".dialog-cancel-button").style = "display: none";
+      }
+      savingTaskDialog.displayView();
+      setTimeout(() => {
+        savingTaskDialog.writingOperation = controller.application.getHomeRecorder().writeHome(controller.home, homeName, {
+          homeSaved: function (home, blob) {
+            delete savingTaskDialog.writingOperation;
+            savingTaskDialog.close();
+            controller.#deliverSavedBlob(home, blob, homeName, postSaveTask, savingTaskDialog);
+          },
+          homeError: function (status, error) {
+            savingTaskDialog.close();
+            console.error(status, error);
+            new JSDialog(preferencesInner,
+              preferencesInner.getLocalizedString("HomePane", "error.title"),
+              preferencesInner.getLocalizedString("HomeController", "saveError", homeName, status + "<br>" + error),
+              { size: "small" }).displayView();
+          }
+        });
+      }, 200);
+    };
+
+    if (supportsFileSystemAccess()) {
+      pickHomeFileToSave(suggested).then((handle) => {
+        if (handle == null) {
+          return;
+        }
+        const name = ensureSh3xFileName(handle.name || suggested, homeExtension, homeExtension2);
+        startWrite(name, handle);
+      });
+      return;
+    }
+
+    const html =
+      '<div class="column1">' +
+      '  <label for="local-save-as-name">@{AppletContentManager.showSaveDialog.message}</label>' +
+      '  <input id="local-save-as-name" type="text" class="local-save-as-name" style="width:100%;box-sizing:border-box;margin-top:0.5em" />' +
+      '  <div class="local-save-as-hint" style="margin-top:0.4em;font-size:12px;opacity:0.75"></div>' +
+      '</div>';
+    const saveAsDialog = new JSDialog(preferences,
+      preferences.getLocalizedString("FileContentManager", "saveDialog.title"),
+      html,
+      {
+        size: "small",
+        applier: function () {
+          const input = saveAsDialog.findElement(".local-save-as-name");
+          let homeName = input != null ? input.value.trim() : "";
+          if (!isValidSaveAsFileName(homeName)) {
+            return;
+          }
+          homeName = ensureSh3xFileName(homeName, homeExtension, homeExtension2);
+          startWrite(homeName, null);
+        }
+      });
+    const nameInput = saveAsDialog.findElement(".local-save-as-name");
+    const okButton = saveAsDialog.findElement(".dialog-ok-button");
+    const hint = saveAsDialog.findElement(".local-save-as-hint");
+    const syncOk = () => {
+      const valid = isValidSaveAsFileName(nameInput ? nameInput.value : "");
+      if (okButton) {
+        okButton.disabled = !valid;
+      }
+      if (hint) {
+        hint.textContent = valid ? "" : "Nom de fichier requis (sans chemin)";
+      }
+    };
+    if (nameInput != null) {
+      nameInput.value = suggested;
+      nameInput.addEventListener("input", syncOk);
+      nameInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          if (isValidSaveAsFileName(nameInput.value)) {
+            saveAsDialog.validate();
+          }
+        }
+      });
+    }
+    saveAsDialog.displayView();
+    syncOk();
+    if (nameInput != null) {
+      setTimeout(() => {
+        nameInput.focus();
+        nameInput.select();
+      }, 50);
     }
   }
 
@@ -219,6 +489,11 @@ export class LocalFileHomeController extends HomeController {
    * Removes home from application homes list.
    */
   close() {
+    if (this.home.localFileObjectUrl) {
+      ZIPTools.disposeZIP(this.home.localFileObjectUrl);
+      URL.revokeObjectURL(this.home.localFileObjectUrl);
+      this.home.localFileObjectUrl = null;
+    }
     this.home.setRecovered(false);
     this.application.deleteHome(this.home);
     this.getView().dispose();
@@ -279,9 +554,14 @@ export class DirectRecordingHomeController extends HomeController {
               controller.application.addHome(home);
             },
             homeError: function (error) {
-              const message = preferences.getLocalizedString("HomeController", "openError", homeName) + "\n" + error;
-              console.log(error);
-              alert(message);
+              const detail = formatHomeOpenError(error);
+              console.error("Open home error:", error);
+              const title = preferences.getLocalizedString("HomePane", "error.title");
+              const body = preferences.getLocalizedString("HomeController", "openError", homeName)
+                + "<br><pre style='white-space:pre-wrap;max-height:12em;overflow:auto;font-size:12px'>"
+                + detail.replace(/</g, "&lt;")
+                + "</pre>";
+              new JSDialog(preferences, title, body, { size: "medium" }).displayView();
             },
             progression: function (part, info, percentage) {
             }
@@ -293,7 +573,9 @@ export class DirectRecordingHomeController extends HomeController {
         availableHomes: function (homes) {
           if (homes.length == 0) {
             const message = preferences.getLocalizedString("AppletContentManager", "showOpenDialog.noAvailableHomes");
-            alert(message);
+            new JSDialog(preferences,
+              preferences.getLocalizedString("HomePane", "error.title"),
+              message, { size: "small" }).displayView();
           } else {
             const html =
               '  <div class="column1">' +
@@ -355,8 +637,10 @@ export class DirectRecordingHomeController extends HomeController {
                   },
                   homeError: function (status, error) {
                     const message = preferences.getLocalizedString("AppletContentManager", "confirmDeleteHome.errorMessage", item.innerText);
-                    console.log(message + " : " + error);
-                    alert(message);
+                    console.error(message, error);
+                    new JSDialog(preferences,
+                      preferences.getLocalizedString("HomePane", "error.title"),
+                      message, { size: "small" }).displayView();
                   }
                 });
               });
@@ -366,8 +650,10 @@ export class DirectRecordingHomeController extends HomeController {
         },
         homesError: function (status, error) {
           const message = preferences.getLocalizedString("AppletContentManager", "showOpenDialog.availableHomesError");
-          console.log(message + " : " + error);
-          alert(message);
+          console.error(message, error);
+          new JSDialog(preferences,
+            preferences.getLocalizedString("HomePane", "error.title"),
+            message, { size: "small" }).displayView();
         }
       });
 
@@ -486,8 +772,10 @@ export class DirectRecordingHomeController extends HomeController {
         },
         homesError: function (status, error) {
           const message = preferences.getLocalizedString("AppletContentManager", "showSaveDialog.checkHomeError");
-          console.log(message + " : " + error);
-          alert(message);
+          console.error(message, error);
+          new JSDialog(preferences,
+            preferences.getLocalizedString("HomePane", "error.title"),
+            message, { size: "small" }).displayView();
         }
       });
 
@@ -770,10 +1058,23 @@ export class AutoRecoveryManager {
             for (let i = 0; i < homeNames.length; i++) {
               if (home.getName() != null
                 && this.homeNamesEqual(home.getName(), homeNames[i])) {
-                if (application.configuration.silentAutoRecovery
-                  || confirm(application.getUserPreferences().getLocalizedString("SweetHome3DJSApplication", "confirmRecoverHome"))) {
-                  recoveredHome = true;
-                  manager.autoSaveRecorder.readHome(homeNames[i], {
+                recoveredHome = true;
+                const recoveredName = homeNames[i];
+                const attachNormalListeners = () => {
+                  home.addPropertyChangeListener("MODIFIED", homeModificationListener);
+                  home.addPropertyChangeListener("NAME", homeNameModificationListener);
+                  if (home.isModified()) {
+                    manager.saveRecoveredHomes();
+                    manager.restartTimer();
+                  }
+                };
+                const declineRecover = () => {
+                  manager.recoveredHomeNames.splice(manager.recoveredHomeNames.indexOf(home.getName()), 1);
+                  manager.deleteRecoveredHome(recoveredName);
+                  attachNormalListeners();
+                };
+                const proceedRecover = () => {
+                  manager.autoSaveRecorder.readHome(recoveredName, {
                     homeLoaded: function (replacingHome) {
                       application.removeHomesListener(homesListener);
                       application.getHomeController(home).close();
@@ -791,15 +1092,41 @@ export class AutoRecoveryManager {
                       application.addHomesListener(homesListener);
                     },
                     homeError: function (error) {
-                      const message = application.getUserPreferences().
-                        getLocalizedString("HomeController", "openError", home.getName()) + "\n" + error;
-                      console.log(message);
-                      alert(message);
+                      const preferences = application.getUserPreferences();
+                      const detail = formatHomeOpenError(error);
+                      console.error("Recover home error:", error);
+                      const body = preferences.getLocalizedString("HomeController", "openError", home.getName())
+                        + "<br><pre style='white-space:pre-wrap;max-height:12em;overflow:auto;font-size:12px'>"
+                        + detail.replace(/</g, "&lt;")
+                        + "</pre>";
+                      new JSDialog(preferences,
+                        preferences.getLocalizedString("HomePane", "error.title"),
+                        body, { size: "medium" }).displayView();
+                      attachNormalListeners();
                     },
                   });
+                };
+                if (application.configuration.silentAutoRecovery) {
+                  proceedRecover();
                 } else {
-                  manager.recoveredHomeNames.splice(manager.recoveredHomeNames.indexOf(home.getName()), 1);
-                  manager.deleteRecoveredHome(homeNames[i]);
+                  const preferences = application.getUserPreferences();
+                  let accepted = false;
+                  const confirmDialog = new JSDialog(preferences,
+                    preferences.getLocalizedString("HomePane", "message.title"),
+                    preferences.getLocalizedString("SweetHome3DJSApplication", "confirmRecoverHome"),
+                    {
+                      size: "small",
+                      applier: function () {
+                        accepted = true;
+                        proceedRecover();
+                      },
+                      disposer: function () {
+                        if (!accepted) {
+                          declineRecover();
+                        }
+                      }
+                    });
+                  confirmDialog.displayView();
                 }
                 break;
               }

@@ -28,6 +28,7 @@ import { HomeComponent3D } from './HomeComponent3D';
 import { HomeRecorder } from './HomeRecorder';
 import { ModelLoader } from './ModelLoader';
 import { TextureManager } from './TextureManager';
+import { ModelManager } from './ModelManager';
 import { DefaultUserPreferences, UserPreferences } from './UserPreferences';
 import { OperatingSystem } from './URLContent';
 import { ZIPTools } from './URLContent';

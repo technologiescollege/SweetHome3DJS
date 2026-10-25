@@ -980,34 +980,6 @@ export class Max3DSLoader extends ModelLoader {
   }
 
   /**
-   * Creates a chunk with its ID and length.
-   * @param {number} id
-   * @param {number} length
-   * @constructor
-   * @private
-   */
-  static Chunk3DS(id, length) {
-    if (length < 6) {
-      throw new IncorrectFormat3DException("Invalid chunk " + id + " length " + length);
-    }
-    this.id = id;
-    this.length = length;
-    this.readLength = 6;
-  }
-
-  /**
-   * Creates an input stream storing chunks hierarchy and other data required during parsing.
-   * @param {Uint8Array} input
-   * @constructor
-   * @private
-   */
-  static ChunksInputStream(input) {
-    this.input = input;
-    this.index = 0;
-    this.stack = []; // Chunk3DS [] 
-  }
-
-  /**
    * Creates a 3DS mesh.
    * @param {string} name, 
    * @param {Point3f[]} vertices
@@ -1149,6 +1121,15 @@ Max3DSLoader.TRACK_KEY_USE_EASE_FROM = 0x10;
 Max3DSLoader.DEFAULT_APPEARANCE = null;
 
 class Chunk3DS {
+  constructor(id, length) {
+    if (length < 6) {
+      throw new IncorrectFormat3DException("Invalid chunk " + id + " length " + length);
+    }
+    this.id = id;
+    this.length = length;
+    this.readLength = 6;
+  }
+
   incrementReadLength(readBytes) {
     this.readLength += readBytes;
   }
@@ -1161,6 +1142,12 @@ class Chunk3DS {
 Max3DSLoader.Chunk3DS = Chunk3DS;
 
 class ChunksInputStream {
+  constructor(input) {
+    this.input = input;
+    this.index = 0;
+    this.stack = [];
+  }
+
   /**
    * Returns the next value in input stream or -1 if end is reached.
    * @private

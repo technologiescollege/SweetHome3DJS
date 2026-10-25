@@ -27,6 +27,7 @@ import {
 
 import { Object3DBranch } from './Object3DBranch';
 import { TextureManager } from './TextureManager';
+import { ModelManager } from './ModelManager';
 import {
   Appearance3D, Shape3D, TransformGroup3D, IndexedTriangleArray3D,
   GeometryInfo3D,

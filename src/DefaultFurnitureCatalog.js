@@ -122,7 +122,16 @@ export class DefaultFurnitureCatalog extends FurnitureCatalog {
         ignored = null;
       }
       if (ignored == null || !this.parseBoolean(ignored)) {
-        let piece = ignored == null ? this.readPieceOfFurniture(resource, index, furnitureCatalogUrl, furnitureResourcesUrlBase) : null;
+        let piece = null;
+        if (ignored == null) {
+          try {
+            piece = this.readPieceOfFurniture(resource, index, furnitureCatalogUrl, furnitureResourcesUrlBase);
+          } catch (ex) {
+            // Meuble mal formé dans une bibliothèque tierce : ignorer et continuer
+            console.warn("Skipping furniture #" + index + ":", ex && ex.message ? ex.message : ex);
+            continue;
+          }
+        }
         if (piece == null) {
           break;
         } else {
@@ -627,21 +636,33 @@ export class DefaultFurnitureCatalog extends FurnitureCatalog {
     let shelfBoxes = null;
     let shelfBoxesString = this.getOptionalString(resource, this.getKey(DefaultFurnitureCatalog.PropertyKey.SHELF_BOXES, index), null);
     if (shelfBoxesString != null) {
-      let values = shelfBoxesString.split(/ +/);
-      if (values.length % 6 != 0) {
-        throw new IllegalArgumentException(
-          "Expected a multiple of 6 values in " + this.getKey(DefaultFurnitureCatalog.PropertyKey.SHELF_BOXES, index) + " key");
-      } else {
-        shelfBoxes = new Array(values.length / 6);
-        for (let i = 0; i < shelfBoxes.length; i++) {
-          shelfBoxes[i] = new BoxBounds(
-            parseFloat(values[i * 6]) / width,
-            parseFloat(values[i * 6 + 1]) / depth,
-            parseFloat(values[i * 6 + 2]) / height,
-            parseFloat(values[i * 6 + 3]) / width,
-            parseFloat(values[i * 6 + 4]) / depth,
-            parseFloat(values[i * 6 + 5]) / height);
+      let values = shelfBoxesString.trim().split(/\s+/).filter((v) => v.length > 0);
+      if (values.length === 0) {
+        return null;
+      }
+      // Bibliothèques tierces : tolérer un nombre de valeurs non multiple de 6
+      // (tronque au multiple inférieur, ou ignore si < 6) plutôt que de faire échouer tout l'import.
+      if (values.length % 6 !== 0) {
+        const usable = values.length - (values.length % 6);
+        console.warn(
+          "Invalid " + this.getKey(DefaultFurnitureCatalog.PropertyKey.SHELF_BOXES, index) +
+          " (" + values.length + " values, expected multiple of 6)" +
+          (usable > 0 ? "; truncating to " + usable : "; ignored")
+        );
+        if (usable === 0) {
+          return null;
         }
+        values = values.slice(0, usable);
+      }
+      shelfBoxes = new Array(values.length / 6);
+      for (let i = 0; i < shelfBoxes.length; i++) {
+        shelfBoxes[i] = new BoxBounds(
+          parseFloat(values[i * 6]) / width,
+          parseFloat(values[i * 6 + 1]) / depth,
+          parseFloat(values[i * 6 + 2]) / height,
+          parseFloat(values[i * 6 + 3]) / width,
+          parseFloat(values[i * 6 + 4]) / depth,
+          parseFloat(values[i * 6 + 5]) / height);
       }
     }
     return shelfBoxes;

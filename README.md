@@ -4,105 +4,130 @@
 
 ![SweetHome3DJS Screenshot](sweethome3djs-screenshot.jpg)
 
-[SweetHome3DJS][project-url] is a web-based version of the popular interior design application [Sweet Home 3D](http://www.sweethome3d.com/), originally implemented in Java. This project represents a work-in-progress effort to refactor and modernize the existing SweetHome3DJS implementation.
+[SweetHome3DJS][project-url] is a Vite / ESM / TypeScript fork of the Sweet Home 3D JS web editor (based on the [luxvitae-eco](https://github.com/luxvitae-eco/SweetHome3DJS) modernization of the official Space Mushrooms build).
 
-## 🏠 About Sweet Home 3D
+## About
 
-Sweet Home 3D is a free interior design application that helps you draw the plan of your house, arrange furniture on it, and visit the results in 3D. The original application is written in Java and runs as a desktop application.
+Sweet Home 3D helps you draw house plans, arrange furniture, and preview the result in 3D. This fork runs entirely in the browser with **local Open / Save** (no PHP/JSP backend required for day-to-day use).
 
-## 🔧 Project Goals
+## Status
 
-This project aims to evolve the existing SweetHome3DJS implementation by:
+Usable for local editing of `.sh3x` / `.sh3d` files. Still evolving: the core remains a large JSweet-era codebase (`SweetHome3D.ts`), furniture import from the UI is not available (use the CLI), and some official online features are out of scope.
 
-- Eliminating Java toolchains dependency
-- Refactoring the codebase to use modern frontend technologies:
-  - NPM toolchain
-  - ECMAScript Modules (ESM)
-  - TypeScript
-- Making the application more familiar to modern frontend developers
-- Improving maintainability and extensibility
+Working today:
 
-> [!WARNING]
-> This project is a WORK IN PROGRESS and is NOT READY FOR PRODUCTION USE. 
-> 
-> Critical features such as import, export, save, and load functionalities require significant refactoring and additional development before this application can be considered stable for production environments. Users should exercise extreme caution and expect incomplete or non-functional features.
+- Open / Save / Save as (download `.sh3x`)
+- Preferences + auto-recovery + resource cache in IndexedDB
+- Furniture catalogs via JSON (+ CLI `import-sh3f`)
+- Checks: missing ESM imports + smoke `.sh3x`
 
-## Tasks
-
-- [ ] Refactor existing codebase to use modern frontend technologies
-- [ ] Eliminate dependency on Java toolchains
-- [ ] Improve application familiarity for modern frontend developers
-- [ ] Enhance maintainability and extensibility
-- [ ] Resolve Vite and TypeScript configuration issues
-- [ ] Fix missing type declarations for core dependencies
-- [ ] Address PNPM package management conflicts
-
-## 🚀 Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Node.js (version 16 or higher)
-- npm or pnpm package manager
+- Node.js 18+
+- npm or pnpm
 
-### Installation
+### Install & run
 
 ```bash
-# Clone the repository
 git clone https://github.com/luxvitae-eco/SweetHome3DJS.git
-
-# Navigate to the project directory
 cd SweetHome3DJS
-
-# Install dependencies
-pnpm install
+npm install
+npm run dev
 ```
 
-### Development
+Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/).
+
+- **Open** — File System Access picker (Chrome/Edge), classic file input, or drag-and-drop `.sh3x` / `.sh3d`
+- **Save** / **Save as** — rewrite the same file when a FS handle exists; otherwise download `.sh3x`
+- Preferences, recovery, and extracted models use **IndexedDB** (cache pruned by count + size)
+- **Theme** in Preferences: Light / Dark / Automatic (follows the OS)
+
+### Checks & build
 
 ```bash
-# Start the development server
-pnpm dev
+npm run check    # audit-imports + smoke-open-sh3x
+npm run build
 ```
 
-### Building for Production
+### Import furniture libraries (`.sh3f` / OBJ+MTL)
+
+**In the app:** File → Import furniture library (or the toolbar action). You can select one or more of:
+
+- `.sh3f` libraries (or a `.zip` that wraps a `.sh3f`)
+- `.zip` archives that contain OBJ + MTL (+ textures) — a catalog entry is built automatically
+- loose `.obj` / `.mtl` / texture files (select them together)
+- several furniture ZIPs at once (merged into one local library)
+
+For OBJ/MTL imports without a preview image, a 3D thumbnail is rendered automatically (WebGL) and stored in the library.
+
+Libraries are stored in IndexedDB and reloaded automatically.
+
+**CLI** (writes into `public/` for a permanent project catalog):
 
 ```bash
-# Build the application
-pnpm build
+npm run import-sh3f -- "<url-or-path>" --name MyCatalog --register
 ```
 
-## 📁 Project Structure
+Details: [scripts/import-sh3f.md](scripts/import-sh3f.md).
+
+### Scratchomised (Scratch / electroBlockly ↔ Sweet Home 3D)
+
+Bridge compatible with [Scratchomised](https://github.com/LyceeLivet/Scratchomised) (MIT). A browser page cannot listen on a TCP port, so `npm run dev` / `preview` also starts a small WebSocket relay on **port 55125**.
+
+1. `npm run dev` (bridge + app)
+2. Toolbar icons **house+play** / **house+stop**, or menu **Scratchomised → Démarrer / Arrêter**
+3. TurboWarp: load `public/scratchomised/Scratchomised.js` (**Run without sandbox**), connect to `127.0.0.1:55125`
+4. **electroBlockly** (future host): read furniture via the plugin API
+
+```js
+const api = window.SweetHome3DJS.plugins.scratchomised;
+api.start();
+api.getFurniture();              // [{ id, name, label, exportEntry, kinds, color, power, … }]
+api.getFurnitureMenuItems({ kind: "light" });
+api.setProperty(idOrExportEntry, "color", "0xFFFF00");
+api.on("furniture", (ev) => { /* sync Blockly menus */ });
+```
+
+Standalone bridge: `npm run scratchomised`. Not available on static hosting alone (Node relay required).
+
+### Updating from official SweetHome3DJS
+
+There is no automatic sync with SourceForge. Use:
+
+```bash
+npm run diff-official -- --download 7.5.2 --download 7.6.0
+```
+
+Procedure (French): [scripts/sync-official.md](scripts/sync-official.md).
+
+## Project structure
 
 ```
 SweetHome3DJS/
-├── public/                 # Static assets
-│   └── lib/                # Library files and resources
-├── src/                    # Source code
-│   ├── HomeRecorder/       # Home recording functionality
-│   ├── UserPreferences/    # User preferences management
-│   └── ...                 # Other core modules
-├── index.html              # Main HTML entry point
-├── package.json            # Project dependencies and scripts
-└── vite.config.ts          # Vite configuration
+├── public/lib/             # Catalogs, furniture, locales
+├── scripts/                # import-sh3f, diff-official, audit, smoke, SAX patch
+├── src/                    # Application (Vite ESM)
+├── index.html
+├── package.json
+└── vite.config.ts
 ```
 
-## 🛠️ Technologies Used
+## Stack
 
-- [Vite](https://vitejs.dev/) - Next generation frontend tooling
-- [TypeScript](https://www.typescriptlang.org/) - Typed JavaScript
-- [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) - Modern JavaScript module system
-- Custom 3D rendering engine based on WebGL
+- [Vite](https://vitejs.dev/)
+- [TypeScript](https://www.typescriptlang.org/) (progressive)
+- ES Modules
+- WebGL 3D view
 
-## 📝 License
+## License
 
-This project is licensed under the GNU General Public License v2.0 - see the [LICENSE](LICENSE) file for details.
+GNU GPL v2 — see [LICENSE](LICENSE). Same terms as Sweet Home 3D.
 
-The original Sweet Home 3D is also licensed under GPL v2.0. This web adaptation maintains the same licensing terms to ensure compatibility and openness.
+## Acknowledgments
 
-## 🙏 Acknowledgments
-
-- Original Sweet Home 3D project by Emmanuel Puybaret
-- [luxvitae-eco](https://github.com/luxvitae-eco) for the ongoing refactoring efforts
-
+- Original Sweet Home 3D / SweetHome3DJS by Emmanuel Puybaret / Space Mushrooms
+- [luxvitae-eco](https://github.com/luxvitae-eco) TypeScript / Vite refactoring
 
 [project-url]: https://github.com/luxvitae-eco/SweetHome3DJS

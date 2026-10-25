@@ -19,6 +19,7 @@
  */
 
 import { ModelLoader } from './ModelLoader';
+import { ModelManager } from './ModelManager';
 import { ModelPreviewComponent } from './ModelPreviewComponent';
 import { URLContent } from './URLContent';
 import { ZIPTools } from './URLContent';

@@ -35,6 +35,14 @@ import { KeyStroke } from './core';
 import { AbstractAction } from './graphics2d';
 import { OperatingSystem } from './URLContent';
 import { ZIPTools } from './URLContent';
+import { TextureManager } from './TextureManager';
+import { pickAndImportFurnitureLibrary } from './LocalFurnitureLibraryImport';
+import {
+  initScratchomisedOnHomePane,
+  createScratchomisedActions as createScratchomisedActionsImpl,
+  createScratchomisedToggleButton as createScratchomisedToggleButtonImpl,
+  addScratchomisedMenu as addScratchomisedMenuImpl,
+} from './scratchomised/ScratchomisedHomePane';
 
 /**
  * Creates home view associated with its controller.
@@ -69,6 +77,11 @@ export class HomePane {
     this.addUserPreferencesListener(preferences);
     this.addPlanControllerListener(controller.getPlanController());
     this.addFocusListener();
+
+    // Scratchomised bridge UI + window.SweetHome3DJS.plugins.scratchomised API
+    // (implementation lives in src/scratchomised/ScratchomisedHomePane.js).
+    initScratchomisedOnHomePane(this, home);
+
     this.createToolBar(home, preferences, controller);
     this.createPopupMenus(home, preferences);
     this.initSplitters();
@@ -643,18 +656,6 @@ export class HomePane {
   }
 
   /**
-   * Preferences property listener bound to this component with a weak reference to avoid
-   * strong link between preferences and this component.
-   * @param {HomePane} homePane
-   * @constructor
-   * @ignore
-   */
-  static UserPreferencesChangeListener(homePane) {
-    // TODO Manage weak reference ?
-    this.homePane = homePane;
-  }
-
-  /**
    * Sets whether some actions should be visible or not.
    * @param {UserPreferences} preferences
    * @private
@@ -904,17 +905,6 @@ export class HomePane {
   }
 
   /**
-   * Preferences property listener bound to this component with a weak reference to avoid
-   * strong link between preferences and this component.
-   * @constructor
-   * @private
-   */
-  static MagnetismChangeListener(homePane, enableDisableMagnetismButton) {
-    this.enableDisableMagnetismButton = enableDisableMagnetismButton;
-    this.homePane = homePane;
-  }
-
-  /**
    * Creates an action that is selected when all the text of the
    * selected items in <code>home</code> use bold style.
    * @param {HomeView.ActionType} actionType
@@ -1080,6 +1070,11 @@ export class HomePane {
     this.addSeparator(toolBar);
 
     this.addActionToToolBar(HomeView.ActionType.ADD_HOME_FURNITURE, toolBar, "toolbar-optional");
+    this.addActionToToolBar(HomeView.ActionType.IMPORT_FURNITURE_LIBRARY, toolBar);
+    const scratchomisedButton = this.createScratchomisedToggleButton();
+    if (scratchomisedButton != null) {
+      this.addButtonToToolBar(toolBar, scratchomisedButton);
+    }
     this.addSeparator(toolBar);
 
     this.addToggleActionToToolBar(HomeView.ActionType.SELECT, toolBar);
@@ -1143,6 +1138,8 @@ export class HomePane {
           ((builder) => {
             homePane.addActionToMenu(ActionType.ADD_HOME_FURNITURE, builder);
             homePane.addActionToMenu(ActionType.ADD_FURNITURE_TO_GROUP, builder);
+            builder.addSeparator();
+            homePane.addActionToMenu(ActionType.IMPORT_FURNITURE_LIBRARY, builder);
           }));
       }
 
@@ -1253,6 +1250,7 @@ export class HomePane {
             homePane.addActionToMenu(ActionType.DISPLAY_ALL_LEVELS, builder);
             homePane.addActionToMenu(ActionType.DISPLAY_SELECTED_LEVEL, builder);
             homePane.addActionToMenu(ActionType.MODIFY_3D_ATTRIBUTES, builder);
+            homePane.addScratchomisedMenu(builder);
           }));
       }
     } else {
@@ -1293,6 +1291,7 @@ export class HomePane {
           builder.addSeparator();
           homePane.addActionToMenu(ActionType.ADD_HOME_FURNITURE, builder);
           homePane.addActionToMenu(ActionType.ADD_FURNITURE_TO_GROUP, builder);
+          homePane.addActionToMenu(ActionType.IMPORT_FURNITURE_LIBRARY, builder);
           builder.addSeparator();
           homePane.addActionToMenu(ActionType.MODIFY_FURNITURE, builder);
           homePane.addActionToMenu(ActionType.GROUP_FURNITURE, builder);
@@ -1361,10 +1360,39 @@ export class HomePane {
           homePane.addActionToMenu(ActionType.DISPLAY_ALL_LEVELS, builder);
           homePane.addActionToMenu(ActionType.DISPLAY_SELECTED_LEVEL, builder);
           homePane.addActionToMenu(ActionType.MODIFY_3D_ATTRIBUTES, builder);
+          homePane.addScratchomisedMenu(builder);
           builder.addSeparator();
           homePane.addActionToMenu(ActionType.ABOUT, builder);
         });
     }
+  }
+
+  /**
+   * Scratchomised start/stop actions (see src/scratchomised/ScratchomisedHomePane.js).
+   * @private
+   */
+  createScratchomisedActions() {
+    createScratchomisedActionsImpl(this);
+  }
+
+  /**
+   * Toolbar toggle for the Scratchomised bridge.
+   * @param {string} [additionalClass]
+   * @return {HTMLButtonElement|null}
+   * @private
+   */
+  createScratchomisedToggleButton(additionalClass) {
+    return createScratchomisedToggleButtonImpl(this, additionalClass);
+  }
+
+  /**
+   * Appends Scratchomised Start / Stop / Status items to a popup menu.
+   * @param {*} builder
+   * @param {{ noSeparator?: boolean }} [options]
+   * @private
+   */
+  addScratchomisedMenu(builder, options) {
+    addScratchomisedMenuImpl(this, builder, options);
   }
 
   /**
@@ -1944,13 +1972,44 @@ export class HomePane {
             if (mouseListener.draggedImage == null) {
               let img = document.createElement("img");
               let originalIcon = homePane.controller.getFurnitureCatalogController().getView().getHTMLElement().querySelector(".furniture.selected .furniture-icon");
-              img.src = originalIcon.src;
-              let style = window.getComputedStyle(originalIcon);
-              img.style.width = style.width;
-              img.style.height = style.height;
+              if (originalIcon != null && originalIcon.src) {
+                img.src = originalIcon.src;
+                let style = window.getComputedStyle(originalIcon);
+                img.style.width = style.width || "64px";
+                img.style.height = style.height || "64px";
+              } else {
+                // Icône pas encore chargée (bibliothèque locale / texture async) : fantôme neutre
+                img.width = 64;
+                img.height = 64;
+                img.style.width = "64px";
+                img.style.height = "64px";
+                img.style.backgroundColor = "#ced4da";
+                img.alt = mouseListener.selectedPiece.getName
+                  ? mouseListener.selectedPiece.getName()
+                  : "";
+                try {
+                  const iconContent = mouseListener.selectedPiece.getIcon
+                    ? mouseListener.selectedPiece.getIcon()
+                    : mouseListener.selectedPiece.icon;
+                  if (iconContent != null) {
+                    TextureManager.getInstance().loadTexture(iconContent, {
+                      textureUpdated: function (image) {
+                        if (mouseListener.draggedImage === img && image && image.src) {
+                          img.src = image.src;
+                          img.style.backgroundColor = "transparent";
+                        }
+                      },
+                      textureError: function () { /* garder le fantôme */ }
+                    });
+                  }
+                } catch (_) {
+                  /* ignore */
+                }
+              }
               img.style.position = "absolute";
               img.style.opacity = 0.6;
               img.style.zIndex = 105;
+              img.style.pointerEvents = "none";
               mouseListener.draggedImage = img;
               document.body.appendChild(img);
             }
@@ -1974,7 +2033,11 @@ export class HomePane {
               if (mouseListener.previousView != null) {
                 if (mouseListener.previousView === homePane.controller.getPlanController().getView()
                   && !mouseListener.escaped) {
-                  homePane.controller.getPlanController().stopDraggedItems();
+                  try {
+                    homePane.controller.getPlanController().stopDraggedItems();
+                  } catch (_) {
+                    /* ignore */
+                  }
                 }
                 var component = mouseListener.previousView;
                 if (component && typeof component.setCursor === "function") {
@@ -2071,7 +2134,11 @@ export class HomePane {
                   var view;
                   let pointInView = mouseListener.getPointInPlanView(ev, transferredFurniture);
                   if (pointInView != null) {
-                    homePane.controller.getPlanController().stopDraggedItems();
+                    try {
+                      homePane.controller.getPlanController().stopDraggedItems();
+                    } catch (_) {
+                      /* drag jamais démarré (ex. icône absente au début du geste) */
+                    }
                     view = homePane.controller.getPlanController().getView();
                     homePane.controller.drop(transferredFurniture, view, pointInView[0], pointInView[1]);
                     var view = mouseListener.previousView;
@@ -2138,7 +2205,11 @@ export class HomePane {
         if (!mouseListener.escaped) {
           if (mouseListener.previousView != null) {
             if (mouseListener.previousView === homePane.controller.getPlanController().getView()) {
-              homePane.controller.getPlanController().stopDraggedItems();
+              try {
+                homePane.controller.getPlanController().stopDraggedItems();
+              } catch (_) {
+                /* ignore */
+              }
             }
             if (mouseListener.previousCursor != null && typeof mouseListener.previousView.setCursor === "function") {
               mouseListener.previousView.setCursor(mouseListener.previousCursor);
@@ -2368,6 +2439,44 @@ export class HomePane {
    * @ignore
    */
   showImportFurnitureLibraryDialog() {
+    // Flux asynchrone local (.sh3f / ZIP OBJ+MTL / multi-fichiers).
+    const homePane = this;
+    const preferences = this.preferences;
+    pickAndImportFurnitureLibrary(preferences, {
+      confirmReplace: (slug) => homePane.confirmReplaceFurnitureLibrary(slug),
+      showMessage: (result) => {
+        const name = (result && (result.displayName || result.slug)) || "";
+        const count = result && result.pieceCount != null ? result.pieceCount : "";
+        let message;
+        try {
+          message = preferences.getLocalizedString(
+            "HomeController",
+            "importedFurnitureLibraryMessage",
+            name
+          );
+        } catch (_) {
+          message = "Meubles importés : " + name;
+        }
+        if (count !== "") {
+          message += " — " + count + " meuble(s)";
+        }
+        homePane.showMessage(message);
+      },
+      showError: (error) => {
+        let message;
+        try {
+          message = preferences.getLocalizedString(
+            "HomeController",
+            "importFurnitureLibraryError",
+            error && error.message ? error.message : String(error)
+          );
+        } catch (_) {
+          message = "Erreur d'import : " + (error && error.message ? error.message : error);
+        }
+        homePane.showError(message);
+      },
+    });
+    return null;
   }
 
   /**
@@ -2378,7 +2487,22 @@ export class HomePane {
    * @ignore
    */
   confirmReplaceFurnitureLibrary(furnitureLibraryName) {
-    return true;
+    const preferences = this.preferences;
+    let message;
+    try {
+      message = preferences.getLocalizedString(
+        "HomePane",
+        "confirmReplaceFurnitureLibrary.message",
+        furnitureLibraryName
+      );
+      message = String(message).replace(/<\/?[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    } catch (_) {
+      message =
+        "La bibliothèque « " +
+        furnitureLibraryName +
+        " » est déjà importée. Voulez-vous la remplacer ?";
+    }
+    return window.confirm(message);
   }
 
   /**
@@ -2427,7 +2551,10 @@ export class HomePane {
    * @ignore
    */
   showError(message) {
-    alert(message.indexOf("<html>") < 0 ? message : message.replace(/\<\/?\w+(\s+\w+\=[\"\'][^\"\']+[\"\'])*\>/g, " ").replace(/\s+/g, " "));
+    const body = this.#dialogBodyFromMessage(message);
+    new JSDialog(this.preferences,
+      this.preferences.getLocalizedString("HomePane", "error.title"),
+      body, { size: "medium" }).displayView();
   }
 
   /**
@@ -2436,7 +2563,25 @@ export class HomePane {
    * @ignore
    */
   showMessage(message) {
-    alert(message.indexOf("<html>") < 0 ? message : message.replace(/\<\/?\w+(\s+\w+\=[\"\'][^\"\']+[\"\'])*\>/g, " ").replace(/\s+/g, " "));
+    const body = this.#dialogBodyFromMessage(message);
+    new JSDialog(this.preferences,
+      this.preferences.getLocalizedString("HomePane", "message.title"),
+      body, { size: "medium" }).displayView();
+  }
+
+  /**
+   * @param {string} message
+   * @return {string}
+   */
+  #dialogBodyFromMessage(message) {
+    if (message == null) {
+      return "";
+    }
+    const text = String(message);
+    if (text.indexOf("<html>") >= 0 || text.indexOf("<br") >= 0 || text.indexOf("<font") >= 0) {
+      return text.replace(/<\/?html>/gi, "");
+    }
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   /**
@@ -2862,6 +3007,10 @@ HomePane.MenuActionType[HomePane.MenuActionType["TOGGLE_SELECTION_MENU"] = 13] =
 
 
 class UserPreferencesChangeListener {
+  constructor(homePane) {
+    this.homePane = homePane;
+  }
+
   propertyChange(ev) {
     let ActionType = HomeView.ActionType;
     let homePane = this.homePane;
@@ -2891,6 +3040,11 @@ class UserPreferencesChangeListener {
 HomePane.UserPreferencesChangeListener = UserPreferencesChangeListener;
 
 class MagnetismChangeListener {
+  constructor(homePane, enableDisableMagnetismButton) {
+    this.homePane = homePane;
+    this.enableDisableMagnetismButton = enableDisableMagnetismButton;
+  }
+
   /**
    * @ignore
    */

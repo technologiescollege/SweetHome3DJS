@@ -1105,11 +1105,33 @@ ZIPTools.isTransparentImage = imageData => {
 }
 
 /**
- * Returns the folder where a given Javascript .js file was read from.
- * @param {string|RegExp} [script] the URL of a script used in the program  
+ * Returns the folder of static SH3D assets (`lib/`), relative to the app base URL.
+ * Respecte la base Vite (ex. `/SweetHome3DJS/` en preview/prod) pour éviter les 404
+ * sur `lib/resources/*.json`.
+ * @param {string|RegExp} [script] unused (compat API)
  * @package
  * @ignore
  */
 ZIPTools.getScriptFolder = () => {
-  return new URL("lib/", window.location.protocol + "//" + window.location.host).toString();
+  let basePath = "/";
+  try {
+    // Vite injecte import.meta.env.BASE_URL (ex. "/" ou "/SweetHome3DJS/")
+    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) {
+      basePath = String(import.meta.env.BASE_URL);
+    } else {
+      let path = window.location.pathname || "/";
+      if (/\.html?$/i.test(path)) {
+        path = path.substring(0, path.lastIndexOf("/") + 1);
+      } else if (!path.endsWith("/")) {
+        path = path.substring(0, path.lastIndexOf("/") + 1) || "/";
+      }
+      basePath = path;
+    }
+  } catch (_) {
+    basePath = "/";
+  }
+  if (!basePath.endsWith("/")) {
+    basePath += "/";
+  }
+  return new URL(basePath + "lib/", window.location.origin).toString();
 }

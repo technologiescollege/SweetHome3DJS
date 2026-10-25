@@ -22,9 +22,16 @@ import {
 
 import { UserPreferences } from './UserPreferences';
 import { DefaultUserPreferences } from './DefaultUserPreferences';
+import {
+  applyThemePreference,
+  getStoredThemePreference,
+  normalizeThemePreference,
+} from '../ThemeManager';
+import { loadUserFurnitureLibraries } from '../LocalFurnitureLibraryImport';
 
 export class RecordedUserPreferences extends UserPreferences {
   static LANGUAGE = "language";
+  static UI_THEME = "uiTheme";
   static UNIT = "unit";
   static CURRENCY = "currency";
   static VALUE_ADDED_TAX_ENABLED = "valueAddedTaxEnabled";
@@ -152,6 +159,12 @@ export class RecordedUserPreferences extends UserPreferences {
    */
   updatePreferencesFromProperties(properties, defaultUserLanguage, updateCatalogs) {
     this.setLanguage(this.getProperty(properties, RecordedUserPreferences.LANGUAGE, defaultUserLanguage));
+
+    const themeFromPrefs = this.getProperty(properties, RecordedUserPreferences.UI_THEME, null);
+    const uiTheme = normalizeThemePreference(
+      themeFromPrefs != null ? themeFromPrefs : getStoredThemePreference());
+    this.setUiTheme(uiTheme);
+    applyThemePreference(uiTheme);
 
     // Read default furniture and textures catalog
     if (updateCatalogs) {
@@ -283,7 +296,7 @@ export class RecordedUserPreferences extends UserPreferences {
     let savedPropertyListener = () => {
       preferences.writtenPropertiesUpdated = true;
     };
-    let writtenProperties = ["LANGUAGE", "UNIT", "CURRENCY", "VALUE_ADDED_TAX_ENABLED", "DEFAULT_VALUE_ADDED_TAX_PERCENTAGE",
+    let writtenProperties = ["LANGUAGE", "UI_THEME", "UNIT", "CURRENCY", "VALUE_ADDED_TAX_ENABLED", "DEFAULT_VALUE_ADDED_TAX_PERCENTAGE",
       "FURNITURE_CATALOG_VIEWED_IN_TREE", "NAVIGATION_PANEL_VISIBLE", "EDITING_IN_3D_VIEW_ENABLED", "AERIAL_VIEW_CENTERED_ON_SELECTION_ENABLED",
       "OBSERVER_CAMERA_SELECTED_AT_CHANGE", "MAGNETISM_ENABLED", "GRID_VISIBLE", "DEFAULT_FONT_NAME", "FURNITURE_VIEWED_FROM_TOP",
       "FURNITURE_MODEL_ICON_SIZE", "ROOM_FLOOR_COLORED_OR_TEXTURED", "NEW_WALL_PATTERN", "NEW_WALL_THICKNESS",
@@ -292,6 +305,9 @@ export class RecordedUserPreferences extends UserPreferences {
       let writtenProperty = writtenProperties[i];
       this.addPropertyChangeListener(writtenProperty, savedPropertyListener);
     }
+    this.addPropertyChangeListener("UI_THEME", (ev) => {
+      applyThemePreference(ev.getNewValue());
+    });
     this.getTexturesCatalog().addTexturesListener(savedPropertyListener);
   }
 
@@ -421,6 +437,17 @@ export class RecordedUserPreferences extends UserPreferences {
         texturesCatalog.add(category, texture);
       }
     }
+
+    // Recharge les bibliothèques .sh3f importées localement (IndexedDB)
+    loadUserFurnitureLibraries(this)
+      .then((stats) => {
+        if (stats.loaded > 0) {
+          console.info(
+            `[SweetHome3DJS] ${stats.loaded} bibliothèque(s) locale(s), ${stats.pieces} meuble(s)`
+          );
+        }
+      })
+      .catch((ex) => console.warn("Chargement bibliothèques locales:", ex));
   }
 
   /**
@@ -504,6 +531,7 @@ export class RecordedUserPreferences extends UserPreferences {
 
       // Write other preferences
       this.setProperty(properties, RecordedUserPreferences.LANGUAGE, this.getLanguage());
+      this.setProperty(properties, RecordedUserPreferences.UI_THEME, this.getUiTheme());
       this.setProperty(properties, RecordedUserPreferences.UNIT, this.getLengthUnit().name());
       let currency = this.getCurrency();
       if (currency === null) {
@@ -702,19 +730,23 @@ export class RecordedUserPreferences extends UserPreferences {
   }
 
   /**
-   * Returns <code>true</code> if the furniture library at the given <code>location</code> exists.
+   * Returns <code>true</code> if the furniture library at the given <code>location</code> exists
+   * (bibliothèques locales IndexedDB).
    * @ignore
    */
   furnitureLibraryExists(location) {
-    throw new UnsupportedOperationException();
+    // Sync API attendue par HomeController — l’import UI gère l’existence en async.
+    // On renvoie false pour laisser l’import procéder ; le vrai contrôle est dans parseFurnitureLibraryFile.
+    return false;
   }
 
   /**
-   * Throws an exception because these user preferences can't manage additional furniture libraries.
+   * Import local géré via {@link pickAndImportFurnitureLibrary} (HomePane).
+   * Conservé pour compatibilité avec HomeController.
    * @ignore
    */
   addFurnitureLibrary(location) {
-    throw new UnsupportedOperationException();
+    // No-op sync : l’import réel est asynchrone depuis HomePane.showImportFurnitureLibraryDialog.
   }
 
   /**

@@ -31,6 +31,7 @@ import {
   GeometryInfo3D, IndexedLineArray3D,
 } from './scene3d';
 import { TextureManager } from './TextureManager';
+import { ModelManager } from './ModelManager';
 
 /**
  * Creates the 3D wall matching the given home <code>wall</code>.
@@ -234,8 +235,7 @@ export class Wall3D extends Object3DBranch {
               deeperPiece = piece.clone();
               deeperPiece.setDepthInPlan(deeperPiece.getDepth() + 2 * baseboard.getThickness());
             }
-            if (typeof HomeDoorOrWindow !== "undefined"
-              && piece instanceof HomeDoorOrWindow) {
+            if (piece instanceof HomeDoorOrWindow) {
               if (piece.isWallCutOutOnBothSides()) {
                 if (deeperPiece === null) {
                   deeperPiece = piece.clone();
@@ -429,8 +429,7 @@ export class Wall3D extends Object3DBranch {
       let missingModels = [];
       for (var i = 0; i < intersectingDoorOrWindows.length; i++) {
         var piece = intersectingDoorOrWindows[i];
-        if (typeof HomeDoorOrWindow !== "undefined"
-          && piece instanceof HomeDoorOrWindow
+        if (piece instanceof HomeDoorOrWindow
           && (PieceOfFurniture.DEFAULT_CUT_OUT_SHAPE != piece.getCutOutShape()
             || piece.getWallWidth() !== 1
             || piece.getWallLeft() !== 0
@@ -1474,15 +1473,6 @@ export class Wall3D extends Object3DBranch {
     wallSideAppearance.setTransparency(wallsAlpha);
   }
 
-  /**
-  * An area used to compute holes in walls.
-   * @constructor
-   * @private
-  */
-  static DoorOrWindowArea(area, doorsOrWindows) {
-    this.area = area;
-    this.doorsOrWindows = doorsOrWindows;
-  }
 }
 
 Wall3D.LEVEL_ELEVATION_SHIFT = 0.1;
@@ -1492,7 +1482,16 @@ Wall3D.WALL_RIGHT_SIDE = 1;
 
 Wall3D.rotatedModelsFrontAreas = [];
 
+/**
+ * An area used to compute holes in walls.
+ * @private
+ */
 class DoorOrWindowArea {
+  constructor(area, doorsOrWindows) {
+    this.area = area;
+    this.doorsOrWindows = doorsOrWindows;
+  }
+
   getArea() {
     return this.area;
   }

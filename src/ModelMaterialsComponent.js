@@ -25,6 +25,7 @@ import {
 
 import { JSComponent, JSDialog } from './toolkit';
 import { TextureManager } from './TextureManager';
+import { ModelManager } from './ModelManager';
 import { ColorTools } from './CoreTools';
 import { ModelPreviewComponent } from './ModelPreviewComponent';
 import { ColorButton } from './ColorButton';

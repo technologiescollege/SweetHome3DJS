@@ -37,6 +37,7 @@ import {
 } from './scene3d';
 import { URLContent, OperatingSystem } from './URLContent';
 import { HomePieceOfFurniture3D } from './HomePieceOfFurniture3D';
+import { ModelManager } from './ModelManager';
 
 /**
  * Creates a model preview component.
@@ -176,8 +177,7 @@ export class ModelPreviewComponent {
           userActionsListener.pivotCenterPixel = null;
           userActionsListener.boundedPitch = true;
           previewComponent.pickedMaterial = null;
-          if (typeof HomeMaterial !== "undefined"
-            && previewComponent.getModelNode() !== null) {
+          if (previewComponent.getModelNode() !== null) {
             let modelManager = ModelManager.getInstance();
             if (transformationsChangeSupported) {
               userActionsListener.boundedPitch = !modelManager.containsDeformableNode(previewComponent.getModelNode());
@@ -567,9 +567,7 @@ export class ModelPreviewComponent {
     }
     this.model = model;
     this.canvas3D.clear();
-    if (typeof HomePieceOfFurniture !== "undefined") {
-      this.previewedPiece = null;
-    }
+    this.previewedPiece = null;
     if (model !== null) {
       let previewComponent = this;
       ModelManager.getInstance().loadModel(model,
@@ -583,36 +581,23 @@ export class ModelPreviewComponent {
                 : vec3.fromValues(width, height, depth);
               let scaleFactor = 1.8 / Math.max(Math.max(size[0], size[2]), size[1]);
 
-              let modelTransformGroup;
-              if (typeof HomePieceOfFurniture !== "undefined") {
-                if (typeof modelFlags === "boolean") {
-                  modelFlags = modelFlags ? PieceOfFurniture.SHOW_BACK_FACE : 0;
-                }
-                previewComponent.previewedPiece = new HomePieceOfFurniture(
-                  new CatalogPieceOfFurniture(null, null, model,
-                    size[0], size[2], size[1], 0, false, null, null,
-                    modelRotation, modelFlags, null, null, 0, 0, 1, false));
-                previewComponent.previewedPiece.setX(0);
-                previewComponent.previewedPiece.setY(0);
-                previewComponent.previewedPiece.setElevation(-previewComponent.previewedPiece.getHeight() / 2);
-
-                var modelTransform = mat4.create();
-                mat4.scale(modelTransform, modelTransform, vec3.fromValues(scaleFactor, scaleFactor, scaleFactor));
-                modelTransformGroup = new TransformGroup3D(modelTransform);
-
-                let piece3D = new HomePieceOfFurniture3D(previewComponent.previewedPiece, null, true);
-                modelTransformGroup.addChild(piece3D);
-              } else {
-                var modelTransform = modelRotation
-                  ? modelManager.getRotationTransformation(modelRotation)
-                  : mat4.create();
-                mat4.scale(modelTransform, modelTransform, vec3.fromValues(scaleFactor, scaleFactor, scaleFactor));
-                mat4.scale(modelTransform, modelTransform, size);
-                mat4.mul(modelTransform, modelTransform, modelManager.getNormalizedTransform(modelRoot, null, 1));
-
-                modelTransformGroup = new TransformGroup3D(modelTransform);
-                modelTransformGroup.addChild(modelRoot);
+              if (typeof modelFlags === "boolean") {
+                modelFlags = modelFlags ? PieceOfFurniture.SHOW_BACK_FACE : 0;
               }
+              previewComponent.previewedPiece = new HomePieceOfFurniture(
+                new CatalogPieceOfFurniture(null, null, model,
+                  size[0], size[2], size[1], 0, false, null, null,
+                  modelRotation, modelFlags, null, null, 0, 0, 1, false));
+              previewComponent.previewedPiece.setX(0);
+              previewComponent.previewedPiece.setY(0);
+              previewComponent.previewedPiece.setElevation(-previewComponent.previewedPiece.getHeight() / 2);
+
+              let modelTransform = mat4.create();
+              mat4.scale(modelTransform, modelTransform, vec3.fromValues(scaleFactor, scaleFactor, scaleFactor));
+              let modelTransformGroup = new TransformGroup3D(modelTransform);
+
+              let piece3D = new HomePieceOfFurniture3D(previewComponent.previewedPiece, null, true);
+              modelTransformGroup.addChild(piece3D);
 
               let scene = new BranchGroup3D();
               scene.addChild(modelTransformGroup);

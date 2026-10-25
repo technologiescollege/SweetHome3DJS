@@ -21,7 +21,6 @@
 // Requires jszip.min.js
 //          URLContent.js
 
-import { ModelManager } from './ModelManager';
 import { LocalURLContent, HomeURLContent, ZIPTools, } from './URLContent';
 
 /**
@@ -38,7 +37,7 @@ export class ContentDigestManager {
 
   /**
    * Returns an instance of this singleton.
-   * @return {ModelManager} 
+   * @return {ContentDigestManager}
    */
   static getInstance() {
     if (ContentDigestManager.instance == null) {
@@ -248,4 +247,4 @@ export class ContentDigestManager {
  * Singleton
  * @private
  */
-ModelManager.instance = null;
+ContentDigestManager.instance = null;

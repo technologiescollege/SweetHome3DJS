@@ -1,7 +1,7 @@
 {
   "name": "sweethome3djs-ts",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "repository": {
     "type": "git",
@@ -11,7 +11,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "eslint": "eslint-interactive"
+    "eslint": "eslint-interactive",
+    "import-sh3f": "node scripts/import-sh3f.mjs",
+    "diff-official": "node scripts/diff-official.mjs",
+    "audit-imports": "node scripts/audit-missing-imports.mjs",
+    "smoke": "node scripts/smoke-open-sh3x.mjs",
+    "scratchomised": "node scripts/scratchomised-bridge.mjs",
+    "check": "node scripts/audit-missing-imports.mjs && node scripts/smoke-open-sh3x.mjs",
+    "prebuild": "node scripts/audit-missing-imports.mjs && node scripts/smoke-open-sh3x.mjs",
+    "postinstall": "node scripts/patch-xml-sax-parser.mjs"
   },
   "devDependencies": {
     "@types/big.js": "^3.1.3",
@@ -20,8 +28,7 @@
     "globals": "^16.1.0",
     "typescript": "~5.7.2",
     "vite": "^6.3.1",
-    "vite-plugin-eslint": "^1.8.1",
-    "vite-plugin-mock-dev-server": "^1.8.5"
+    "vite-plugin-eslint": "^1.8.1"
   },
   "dependencies": {
     "@flyskypie/j4ts-awtgeom": "^1.0.1",
@@ -31,6 +38,7 @@
     "@types/gl-matrix": "^2.4.5",
     "big.js": "^3.2.0",
     "gl-matrix": "^2.8.1",
-    "jszip": "^2.0.0"
+    "jszip": "^2.0.0",
+    "ws": "^8.22.0"
   }
 }

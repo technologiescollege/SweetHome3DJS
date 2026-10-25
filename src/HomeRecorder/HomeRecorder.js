@@ -32,6 +32,7 @@ import {
 } from '../URLContent';
 import { CoreTools } from '../CoreTools';
 import { ZIPTools } from '../URLContent';
+import { DefaultUserPreferences } from '../UserPreferences';
 
 import WriteHomeWorker from './WriteHomeWorker?worker';
 
@@ -107,8 +108,7 @@ export class HomeRecorder {
                 }
               }
             };
-            recorder.parseHomeXMLEntry(homeXmlEntry, zip, url, typeof ContentDigestManager === "undefined"
-              ? observer : contentObserver);
+            recorder.parseHomeXMLEntry(homeXmlEntry, zip, url, contentObserver);
           } else {
             this.zipError(new Error("No " + homeEntryName + " entry in " + url));
           }
@@ -168,7 +168,9 @@ export class HomeRecorder {
    * @protected 
    */
   getHomeXMLHandler() {
-    return new HomeXMLHandler();
+    // HomeXMLHandler a besoin de préférences ; DefaultUserPreferences ne peut pas
+    // être importé depuis SweetHome3D.ts (dépendance circulaire) — on les fournit ici.
+    return new HomeXMLHandler(new DefaultUserPreferences(false, null));
   }
 
   /**
@@ -435,6 +437,17 @@ export class HomeRecorder {
                         },
                         blobError: function (status, error) {
                           console.warn("Can't saved all home extracted data: " + error);
+                          const errText = String(error && error.name ? error.name + " " + error.message : error || status || "");
+                          // Éviter import() ici : HomeRecorder est aussi chargé par WriteHomeWorker (IIFE).
+                          if ((/quota/i.test(errText) || status === 22)
+                            && typeof globalThis !== "undefined"
+                            && typeof globalThis.__sh3dPruneResourceCache === "function") {
+                            try {
+                              globalThis.__sh3dPruneResourceCache({ maxEntries: 80, maxBytes: 20 * 1024 * 1024 });
+                            } catch (_) {
+                              /* ignore */
+                            }
+                          }
                           replaceContents();
                         }
                       });
@@ -514,7 +527,8 @@ export class HomeRecorder {
                   }
                 }
               } else {
-                ZIPTools.disposeZIP(homeUrl);
+                // Sans cache IndexedDB/HTTP, les HomeURLContent restent en jar:homeUrl —
+                // ne pas disposeZIP ici (sinon modèles/icônes → pavé rouge).
                 observer.homeLoaded(home);
               }
             }

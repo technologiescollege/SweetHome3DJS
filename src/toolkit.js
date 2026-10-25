@@ -1016,9 +1016,7 @@ class JSPopupMenuBuilder {
   addMenuItem(actionOrIconPathOrLabel, itemSelectedListenerOrLabel, itemSelectedListener) {
     let label = null;
     let iconPath = null;
-    var itemSelectedListener = null;
-    // Defined only for a check action
-    const checked = undefined;
+    let listener = null;
     // Defined only for a toggle action
     let selected = undefined;
 
@@ -1035,19 +1033,21 @@ class JSPopupMenuBuilder {
       if (action.getValue(ResourceAction.TOGGLE_BUTTON_GROUP)) {
         selected = action.getValue(AbstractAction.SELECTED_KEY);
       }
-      itemSelectedListener = function () {
+      listener = function () {
         action.actionPerformed();
       };
-    } else if (typeof itemSelectedListener == "function") {
+    } else if (typeof itemSelectedListener === "function") {
+      // addMenuItem(iconPath, label, callback)
       iconPath = actionOrIconPathOrLabel;
       label = itemSelectedListenerOrLabel;
-      itemSelectedListener = itemSelectedListener;
+      listener = itemSelectedListener;
     } else {
+      // addMenuItem(label, callback)
       label = actionOrIconPathOrLabel;
-      itemSelectedListener = itemSelectedListenerOrLabel;
+      listener = itemSelectedListenerOrLabel;
     }
 
-    this.addNewMenuItem(label, iconPath, itemSelectedListener, selected, selected !== undefined ? "radiobutton" : undefined);
+    this.addNewMenuItem(label, iconPath, listener, selected, selected !== undefined ? "radiobutton" : undefined);
     return this;
   }
 

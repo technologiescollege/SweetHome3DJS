@@ -32,6 +32,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
+# Official SweetHome3DJS downloads / diff reports
+.official-cache/
+.official/
+.smoke-tmp/
+tmp-scratchomised/
+tmp-plugin/
+scripts/diff-official-report.md
+scripts/audit-missing-imports-report.md
+
 # Basic Jekyll gitignores (synchronize to Jekyll.gitignore)
 _site/
 .sass-cache/

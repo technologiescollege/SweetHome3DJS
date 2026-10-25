@@ -2,7 +2,14 @@ import '@flyskypie/j4ts-swingundo';
 import { SAXException } from '@flyskypie/xml-sax-parser/exceptions/index.js';
 import { DefaultHandler } from '@flyskypie/xml-sax-parser/DefaultHandlers.js';
 
-import { EventObject, PropertyChangeSupport, UUID } from './core';
+import {
+  EventObject,
+  PropertyChangeSupport,
+  UUID,
+  IllegalStateException,
+  IllegalArgumentException,
+  UnsupportedOperationException,
+} from './core';
 
 /**
  * Due to circular dependency this can't use this at the moment.
@@ -10,6 +17,8 @@ import { EventObject, PropertyChangeSupport, UUID } from './core';
 // import { UserPreferences, DefaultUserPreferences } from './UserPreferences';
 
 import { CoreTools } from './CoreTools'
+import { URLContent, HomeURLContent } from './URLContent';
+import { LengthUnit } from './LengthUnit';
 
 /*
  * Sweet Home 3D, Copyright (c) 2024 Space Mushrooms <info@sweethome3d.com>
@@ -537,7 +546,11 @@ export class HomeXMLHandler extends DefaultHandler {
     static UNIQUE_ATTRIBUTE: string = "@&unique&@";
 
     public constructor(preferences?: any) {
-        if (((preferences != null && preferences instanceof <any>UserPreferences) || preferences === null)) {
+        // UserPreferences vit dans un module séparé (dépendance circulaire) :
+        // on ne peut pas utiliser instanceof UserPreferences ici.
+        const isUserPreferences = preferences != null
+            && typeof (<any>preferences).getFurnitureCatalog === 'function';
+        if ((isUserPreferences || preferences === null)) {
             let __args = arguments;
             super();
             if (this.preferences === undefined) { this.preferences = null; }
@@ -568,7 +581,9 @@ export class HomeXMLHandler extends DefaultHandler {
             this.points = <any>([]);
             this.furnitureVisiblePropertyNames = <any>([]);
             this.printedLevelIds = <any>([]);
-            this.preferences = preferences != null ? preferences : new DefaultUserPreferences(false, null);
+            this.preferences = preferences != null ? preferences : (() => {
+                throw new Error("HomeXMLHandler requires UserPreferences (pass DefaultUserPreferences from HomeRecorder)");
+            })();
         } else if (preferences === undefined) {
             let __args = arguments;
             {
@@ -603,7 +618,9 @@ export class HomeXMLHandler extends DefaultHandler {
                 this.points = <any>([]);
                 this.furnitureVisiblePropertyNames = <any>([]);
                 this.printedLevelIds = <any>([]);
-                this.preferences = preferences != null ? preferences : new DefaultUserPreferences(false, null);
+                this.preferences = preferences != null ? preferences : (() => {
+                throw new Error("HomeXMLHandler requires UserPreferences (pass DefaultUserPreferences from HomeRecorder)");
+            })();
             }
             if (this.preferences === undefined) { this.preferences = null; }
             if (this.home === undefined) { this.home = null; }

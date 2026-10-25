@@ -25,6 +25,18 @@ import { TextureManager } from './TextureManager';
 import { CoreTools } from './CoreTools';
 import { OperatingSystem } from './URLContent';
 
+/** Placeholder partagé (évite canvas×N à chaque rebuild catalogue). */
+const FURNITURE_ICON_PLACEHOLDER_SRC =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">' +
+      '<rect fill="#ced4da" width="128" height="128"/>' +
+      '<text x="64" y="78" text-anchor="middle" font-size="52" font-family="sans-serif" font-weight="bold" fill="#495057">?</text>' +
+    '</svg>'
+  );
+
+const CATALOG_BUILD_CHUNK = 40;
+
 /**
  * Creates a panel that displays <code>catalog</code> furniture in a list.
  * @constructor
@@ -36,6 +48,8 @@ export class FurnitureCatalogListPanel {
     this.container = document.getElementById(containerId);
     this.controller = controller;
     this.preferences = preferences;
+    this._iconObserver = null;
+    this._resetGeneration = 0;
     this.createComponents(catalog, preferences, controller);
   }
 
@@ -315,7 +329,80 @@ export class FurnitureCatalogListPanel {
   /**
    * @private
    */
+  disposeIconObserver() {
+    if (this._iconObserver) {
+      try {
+        this._iconObserver.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      this._iconObserver = null;
+    }
+  }
+
+  /**
+   * Observer : charge l'icône réelle seulement quand la vignette entre dans le viewport.
+   * @private
+   */
+  ensureIconObserver() {
+    if (this._iconObserver || typeof IntersectionObserver === "undefined") {
+      return this._iconObserver;
+    }
+    const panel = this;
+    this._iconObserver = new IntersectionObserver(
+      (entries) => {
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          if (!entry.isIntersecting) continue;
+          const pieceContainer = entry.target;
+          panel._iconObserver.unobserve(pieceContainer);
+          panel.loadPieceIcon(pieceContainer);
+        }
+      },
+      {
+        root: this.container.getElementsByClassName("furniture-catalog-list")[0] || null,
+        rootMargin: "80px 0px",
+        threshold: 0.01,
+      }
+    );
+    return this._iconObserver;
+  }
+
+  /**
+   * Charge la texture d'une vignette (après intersection).
+   * @private
+   */
+  loadPieceIcon(pieceContainer) {
+    if (!pieceContainer || pieceContainer._iconLoading || pieceContainer._iconLoaded) {
+      return;
+    }
+    const piece = pieceContainer.piece;
+    const placeholder = pieceContainer.querySelector("img.furniture-icon");
+    if (piece == null || piece.icon == null || placeholder == null) {
+      return;
+    }
+    pieceContainer._iconLoading = true;
+    TextureManager.getInstance().loadTexture(piece.icon, {
+      textureUpdated: function (image) {
+        image.classList.add("furniture-icon");
+        if (placeholder.parentNode === pieceContainer) {
+          pieceContainer.replaceChild(image, placeholder);
+        }
+        pieceContainer._iconLoaded = true;
+        pieceContainer._iconLoading = false;
+      },
+      textureError: function (error) {
+        pieceContainer._iconLoading = false;
+        console.warn("Image cannot be loaded", error);
+      }
+    });
+  }
+
+  /**
+   * @private
+   */
   clearFurnitureCatalog(catalog) {
+    this.disposeIconObserver();
     let furnitureCatalogList = this.container.getElementsByClassName("furniture-catalog-list")[0];
     let children = furnitureCatalogList.getElementsByClassName("furniture-category-label");
     for (var i = children.length - 1; i >= 0; i--) {
@@ -332,40 +419,65 @@ export class FurnitureCatalogListPanel {
   }
 
   /**
+   * Rebuild catalogue par paquets pour ne pas bloquer / faire planter l'onglet
+   * après import de grosses bibliothèques.
    * @private
    */
   resetFurnitureCatalog(catalog) {
     this.clearFurnitureCatalog();
+    const generation = ++this._resetGeneration;
+    const furnitureCatalogList = this.container.getElementsByClassName("furniture-catalog-list")[0];
+    const jobs = [];
 
-    let furnitureCatalogList = this.container.getElementsByClassName("furniture-catalog-list")[0];
     for (let i = 0; i < catalog.getCategoriesCount(); i++) {
-      let category = catalog.getCategories()[i];
-      let categoryLabel = document.createElement("div");
-      categoryLabel.className = "furniture-category-label";
-      categoryLabel.innerHTML = category.getName();
-      categoryLabel.category = category;
-      furnitureCatalogList.appendChild(categoryLabel);
-
+      const category = catalog.getCategories()[i];
+      jobs.push({ type: "label", category });
       for (let j = 0; j < category.getFurnitureCount(); j++) {
-        let piece = category.getFurniture()[j];
-        let pieceContainer = document.createElement("div");
-        pieceContainer.pieceOfFurniture = piece;
-        pieceContainer.className = "furniture";
-        pieceContainer.innerHTML = '<div class="furniture-label">' + piece.getName() + '</div>';
-        furnitureCatalogList.appendChild(pieceContainer);
-        this.createPieceOfFurniturePanel(pieceContainer, piece);
-        // Memorize piece & category for filtering
-        pieceContainer.category = category;
-        pieceContainer.piece = piece;
+        jobs.push({ type: "piece", category, piece: category.getFurniture()[j] });
       }
-
       if (i < catalog.getCategoriesCount() - 1) {
-        let categorySeparator = document.createElement("div");
-        categorySeparator.className = "furniture-category-separator";
-        categorySeparator.category = category;
-        furnitureCatalogList.appendChild(categorySeparator);
+        jobs.push({ type: "separator", category });
       }
     }
+
+    const panel = this;
+    let offset = 0;
+
+    const processChunk = () => {
+      if (generation !== panel._resetGeneration) {
+        return;
+      }
+      const end = Math.min(offset + CATALOG_BUILD_CHUNK, jobs.length);
+      for (; offset < end; offset++) {
+        const job = jobs[offset];
+        if (job.type === "label") {
+          const categoryLabel = document.createElement("div");
+          categoryLabel.className = "furniture-category-label";
+          categoryLabel.innerHTML = job.category.getName();
+          categoryLabel.category = job.category;
+          furnitureCatalogList.appendChild(categoryLabel);
+        } else if (job.type === "separator") {
+          const categorySeparator = document.createElement("div");
+          categorySeparator.className = "furniture-category-separator";
+          categorySeparator.category = job.category;
+          furnitureCatalogList.appendChild(categorySeparator);
+        } else {
+          const pieceContainer = document.createElement("div");
+          pieceContainer.pieceOfFurniture = job.piece;
+          pieceContainer.className = "furniture";
+          pieceContainer.innerHTML = '<div class="furniture-label">' + job.piece.getName() + '</div>';
+          furnitureCatalogList.appendChild(pieceContainer);
+          panel.createPieceOfFurniturePanel(pieceContainer, job.piece);
+          pieceContainer.category = job.category;
+          pieceContainer.piece = job.piece;
+        }
+      }
+      if (offset < jobs.length) {
+        requestAnimationFrame(processChunk);
+      }
+    };
+
+    processChunk();
   }
 
   /**
@@ -427,15 +539,26 @@ export class FurnitureCatalogListPanel {
       pieceContainer.addEventListener("touchend", touchEndListener);
     }
 
-    TextureManager.getInstance().loadTexture(piece.icon, {
-      textureUpdated: function (image) {
-        image.classList.add("furniture-icon");
-        pieceContainer.appendChild(image);
-      },
-      textureError: function (error) {
-        console.log("Image cannot be loaded", error);
-      }
-    });
+    // Placeholder léger + chargement différé (IntersectionObserver) pour les grosses bibliothèques
+    const placeholder = document.createElement("img");
+    placeholder.classList.add("furniture-icon");
+    placeholder.width = 128;
+    placeholder.height = 128;
+    placeholder.alt = piece.getName ? piece.getName() : "";
+    placeholder.src = FURNITURE_ICON_PLACEHOLDER_SRC;
+    placeholder.loading = "lazy";
+    pieceContainer.appendChild(placeholder);
+
+    if (piece.icon == null) {
+      return;
+    }
+    const observer = this.ensureIconObserver();
+    if (observer) {
+      observer.observe(pieceContainer);
+    } else {
+      // Fallback sans IntersectionObserver
+      this.loadPieceIcon(pieceContainer);
+    }
   }
 
   /** 
@@ -449,7 +572,9 @@ export class FurnitureCatalogListPanel {
       this.toolTipDiv.style.display = "block";
       this.toolTipDiv.innerHTML = this.createCatalogItemTooltipText(pieceContainer.pieceOfFurniture);
       let icon = this.toolTipDiv.querySelector("img");
-      icon.src = pieceIcon.src;
+      if (icon != null && pieceIcon.src) {
+        icon.src = pieceIcon.src;
+      }
       let toolTipBounds = this.toolTipDiv.getBoundingClientRect();
       if (toolTipBounds.x < 0) {
         this.toolTipDiv.style.left = (ev.clientX + 10 - toolTipBounds.x) + "px";
@@ -527,6 +652,7 @@ export class FurnitureCatalogListPanel {
    */
   dispose() {
     this.preferences.removePropertyChangeListener("LANGUAGE", this.languageChangeListener);
+    this._resetGeneration++;
     this.clearFurnitureCatalog();
     this.container.removeChild(document.getElementById("furniture-filter"));
     this.toolTipDiv.parentElement.removeChild(this.toolTipDiv);

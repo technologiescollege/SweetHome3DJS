@@ -741,8 +741,7 @@ export class HomePieceOfFurniture3D extends Object3DBranch {
         && shapeName.indexOf(ModelManager.LIGHT_SHAPE_PREFIX) === 0
         && this.getHome() !== null
         && !this.isSelected(this.getHome().getSelectedItems())
-        && (typeof HomeLight === "undefined"
-          || this.getUserData() instanceof HomeLight)) {
+        && this.getUserData() instanceof HomeLight) {
         // Don't display light sources shapes of unselected lights
         visible = false;
       }
