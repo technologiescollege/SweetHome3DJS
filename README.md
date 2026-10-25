@@ -39,7 +39,7 @@ Open [https://technologiescollege.github.io/SweetHome3DJS/](https://technologies
 2. **Build and deployment → Source**: *Deploy from a branch*
 3. Branch **`gh-pages`** / folder **`/`** → Save
 
-The `gh-pages` branch contains the production `dist/` (Vite `base: /SweetHome3DJS/`). Optionally, pushes to `main` also run [Deploy to GitHub Pages](.github/workflows/deploy.yml) (Actions → Source: *GitHub Actions*).
+Each push to `main` runs [Deploy to GitHub Pages](.github/workflows/deploy.yml): build → publish `dist/` on `gh-pages`.
 
 > Note: the Scratchomised WebSocket bridge is not available on static Pages hosting; use a local `npm run dev` for Scratch / electroBlockly.
 
