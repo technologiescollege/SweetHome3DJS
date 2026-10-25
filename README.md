@@ -33,7 +33,13 @@ Working today:
 
 Open [https://technologiescollege.github.io/SweetHome3DJS/](https://technologiescollege.github.io/SweetHome3DJS/) in a modern browser (Chrome / Edge recommended for File System Access).
 
-After each push to `main`, the [Deploy to GitHub Pages](.github/workflows/deploy.yml) workflow builds the app and publishes `dist/`. In the repo settings, **Pages → Source** must be **GitHub Actions**.
+**Enable the site once** (repo admin):
+
+1. GitHub → **Settings → Pages**
+2. **Build and deployment → Source**: *Deploy from a branch*
+3. Branch **`gh-pages`** / folder **`/`** → Save
+
+The `gh-pages` branch contains the production `dist/` (Vite `base: /SweetHome3DJS/`). Optionally, pushes to `main` also run [Deploy to GitHub Pages](.github/workflows/deploy.yml) (Actions → Source: *GitHub Actions*).
 
 > Note: the Scratchomised WebSocket bridge is not available on static Pages hosting; use a local `npm run dev` for Scratch / electroBlockly.
 
