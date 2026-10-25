@@ -14,6 +14,12 @@ html[data-theme="dark"] {
     --sh3d-scrollbar: #111;
     --sh3d-scrollbar-thumb: #555;
     --sh3d-splitter: #111;
+    --sh3d-accent: #6ea8fe;
+    --sh3d-accent-soft: #1a3a5c;
+    --sh3d-tile: #272727;
+    --sh3d-selection-bg: #1a3a5c;
+    --sh3d-selection-text: #e7f1ff;
+    --sh3d-list-hover: #2c2c2c;
 }
 
 html[data-theme="light"] {
@@ -34,6 +40,9 @@ html[data-theme="light"] {
     --sh3d-accent: #0b5ed7;
     --sh3d-accent-soft: #cfe2ff;
     --sh3d-tile: #f1f3f5;
+    --sh3d-selection-bg: #cfe2ff;
+    --sh3d-selection-text: #084298;
+    --sh3d-list-hover: #e9ecef;
 }
 
 html,
@@ -841,4 +850,119 @@ html[data-theme="light"] .open-dialog .home-list .item {
 
 html[data-theme="light"] .open-dialog .home-list .item:hover {
     background: var(--sh3d-surface-2);
+}
+
+/* ——— Legacy sweethome3djs.css overrides (both themes) ———
+ * Base CSS assumes a dark UI but hard-codes many white lists / dark boxes.
+ * Keep fixes here rather than editing the generated sweethome3djs.css.
+ */
+
+/* About dialog: third-party block was #1b1b1b with dark text in light theme */
+html[data-theme="light"] .about-third-party-licenses {
+    background-color: var(--sh3d-surface-2) !important;
+    color: var(--sh3d-text-muted) !important;
+    border: 1px solid var(--sh3d-border);
+}
+
+html[data-theme="dark"] .about-third-party-licenses {
+    background-color: var(--sh3d-surface-2) !important;
+    color: var(--sh3d-text-muted) !important;
+    border: 1px solid var(--sh3d-border);
+}
+
+.about-dialog a,
+html[data-theme="light"] .about-dialog a,
+html[data-theme="dark"] .about-dialog a {
+    color: var(--sh3d-accent) !important;
+}
+
+html[data-theme="light"] .about-app,
+html[data-theme="light"] .about-version,
+html[data-theme="light"] .about-support,
+html[data-theme="light"] .about-license {
+    color: var(--sh3d-text) !important;
+}
+
+/* White list panels → theme surfaces (open home, textures, materials, combo) */
+html[data-theme="dark"] .open-dialog .home-list,
+html[data-theme="dark"] .texture-chooser-dialog .texture-catalog-list,
+html[data-theme="dark"] .texture-chooser-dialog .texture-search input,
+html[data-theme="dark"] .model-materials-chooser-dialog [data-name="materials-list"],
+html[data-theme="dark"] .combo-box .selection-panel {
+    background-color: var(--sh3d-surface) !important;
+    color: var(--sh3d-text) !important;
+    border-color: var(--sh3d-border) !important;
+}
+
+html[data-theme="light"] .open-dialog .home-list,
+html[data-theme="light"] .texture-chooser-dialog .texture-catalog-list,
+html[data-theme="light"] .texture-chooser-dialog .texture-search input,
+html[data-theme="light"] .model-materials-chooser-dialog [data-name="materials-list"],
+html[data-theme="light"] .combo-box .selection-panel {
+    background-color: var(--sh3d-surface) !important;
+    color: var(--sh3d-text) !important;
+    border-color: var(--sh3d-border) !important;
+}
+
+html[data-theme="dark"] .open-dialog .home-list .item,
+html[data-theme="dark"] .texture-chooser-dialog .texture-catalog-list .item,
+html[data-theme="dark"] .model-materials-chooser-dialog [data-name="materials-list"] > div,
+html[data-theme="dark"] .combo-box .selection-panel > div {
+    color: var(--sh3d-text) !important;
+}
+
+html[data-theme="dark"] .open-dialog .home-list .item:hover,
+html[data-theme="dark"] .texture-chooser-dialog .texture-catalog-list .item:hover,
+html[data-theme="dark"] .model-materials-chooser-dialog [data-name="materials-list"] > div:hover,
+html[data-theme="dark"] .combo-box .selection-panel > div:hover {
+    background-color: var(--sh3d-list-hover) !important;
+    color: var(--sh3d-text) !important;
+}
+
+/* Pale blue selection + light inherited text was unreadable in dark theme */
+.open-dialog .home-list .item.selected,
+.texture-chooser-dialog .texture-catalog-list .item.selected,
+.model-materials-chooser-dialog [data-name="materials-list"] > div.selected,
+.level-dialog .levels-summary > table tr.selected {
+    background-color: var(--sh3d-selection-bg) !important;
+    color: var(--sh3d-selection-text) !important;
+}
+
+.level-dialog .levels-summary > table tr.selected td {
+    color: var(--sh3d-selection-text) !important;
+}
+
+html[data-theme="light"] .level-dialog .levels-summary > table tr[disabled] td {
+    color: var(--sh3d-text-muted) !important;
+    opacity: 0.7;
+}
+
+html[data-theme="dark"] .level-dialog .levels-summary > table tr[disabled] td {
+    color: var(--sh3d-text-muted) !important;
+    opacity: 0.55;
+}
+
+/* Wall dialog selected side panel */
+html[data-theme="dark"] #wall-dialog .columns-2 > div.selected {
+    background: var(--sh3d-selection-bg) !important;
+    border-color: var(--sh3d-accent) !important;
+    color: var(--sh3d-text) !important;
+}
+
+html[data-theme="light"] #wall-dialog .columns-2 > div.selected {
+    background: var(--sh3d-accent-soft) !important;
+    border-color: var(--sh3d-accent) !important;
+    color: var(--sh3d-text) !important;
+}
+
+html[data-theme="dark"] .dialog-content .default-capable {
+    color: var(--sh3d-accent) !important;
+}
+
+/* Plan / 3D pane borders: avoid harsh #111 in light theme */
+html[data-theme="light"] #home-plan,
+html[data-theme="light"] #home-3D-view,
+html[data-theme="light"] #catalog-furniture-pane,
+html[data-theme="light"] #furniture-view {
+    border-color: var(--sh3d-border) !important;
 }

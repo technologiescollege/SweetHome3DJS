@@ -58,6 +58,7 @@ import { Font, FontMetrics, Graphics2D } from './graphics2d';
 import { HTMLCanvas3D } from './HTMLCanvas3D';
 import { OperatingSystem } from './URLContent';
 import { ZIPTools } from './URLContent';
+import { THEME_CHANGE_EVENT } from './ThemeManager';
 
 /**
  * Creates a new plan that displays <code>home</code>.
@@ -100,11 +101,11 @@ export class PlanComponent {
       this.canvas.setAttribute("id", containerOrCanvasId + ".canvas");
       this.canvas.style.width = "100%"; // computedStyle.width;
       this.canvas.style.height = "100%"; // computedStyle.height;
-      if (PlanComponent.initialBackgroundColor === undefined) {
-        PlanComponent.initialBackgroundColor = computedStyle.backgroundColor;
-        PlanComponent.initialForegroundColor = computedStyle.color;
-      }
-      this.canvas.style.backgroundColor = PlanComponent.initialBackgroundColor;  // /!\ computedStyle.backgroundColor and color may change when reseting home
+      // Capture theme colors from the container; refresh on sweethome3d:themechange
+      // (do not freeze forever — light/dark switch would leave wrong plan colors).
+      PlanComponent.initialBackgroundColor = computedStyle.backgroundColor;
+      PlanComponent.initialForegroundColor = computedStyle.color;
+      this.canvas.style.backgroundColor = PlanComponent.initialBackgroundColor;
       this.canvas.style.color = PlanComponent.initialForegroundColor;
       this.canvas.style.font = computedStyle.font;
       this.scrollPane = document.createElement("div");
@@ -147,6 +148,8 @@ export class PlanComponent {
     this.tooltip.style.borderColor = ColorTools.toRGBAStyle(this.getForeground(), 0.7);
     this.tooltip.style.font = this.font;
     this.tooltip.style.color = this.canvas.style.color;
+    this._themeChangeListener = () => plan.applyThemeColors();
+    document.addEventListener(THEME_CHANGE_EVENT, this._themeChangeListener);
     this.tooltip.style.zIndex = 101;
     document.body.appendChild(this.tooltip);
 
@@ -2569,6 +2572,29 @@ export class PlanComponent {
     else {
       return "#000000";
     }
+  }
+
+  /**
+   * Re-read container CSS colors after a light/dark theme switch and repaint.
+   * Clears cached foreground/background used by drawing routines.
+   */
+  applyThemeColors() {
+    if (!this.canvas || !this.container) {
+      return;
+    }
+    const style = window.getComputedStyle(this.container);
+    PlanComponent.initialBackgroundColor = style.backgroundColor;
+    PlanComponent.initialForegroundColor = style.color;
+    this.canvas.style.backgroundColor = style.backgroundColor;
+    this.canvas.style.color = style.color;
+    this.foreground = null;
+    this.background = null;
+    if (this.tooltip) {
+      this.tooltip.style.color = style.color;
+      this.tooltip.style.backgroundColor = ColorTools.toRGBAStyle(this.getBackground(), 0.7);
+      this.tooltip.style.borderColor = ColorTools.toRGBAStyle(this.getForeground(), 0.7);
+    }
+    this.repaint();
   }
 
   /** 

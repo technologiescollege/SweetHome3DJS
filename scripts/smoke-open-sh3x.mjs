@@ -124,6 +124,22 @@ assert(isHomeArchiveFileName("a.sh3x") && !isHomeArchiveFileName("a.txt"), "isHo
 assert(isValidSaveAsFileName("plan.sh3x") && !isValidSaveAsFileName("../x") && !isValidSaveAsFileName("  "), "isValidSaveAsFileName");
 assert(estimateCacheEntryBytes({ content: "abcd" }) >= 4, "estimateCacheEntryBytes");
 assert(normalizeThemePreference("nope") === THEME_SYSTEM, "normalizeThemePreference fallback system");
+assert(
+  readFileSync(join(root, "src", "style.css"), "utf8").includes("about-third-party-licenses"),
+  "thème : contraste dialogue À propos"
+);
+assert(
+  readFileSync(join(root, "src", "style.css"), "utf8").includes("texture-chooser-dialog .texture-catalog-list"),
+  "thème : listes blanches legacy en sombre"
+);
+assert(
+  readFileSync(join(root, "src", "ThemeManager.js"), "utf8").includes("THEME_CHANGE_EVENT"),
+  "thème : événement de changement pour le plan 2D"
+);
+assert(
+  readFileSync(join(root, "src", "PlanComponent.js"), "utf8").includes("applyThemeColors"),
+  "plan 2D se met à jour au changement de thème"
+);
 assert(resolveEffectiveTheme(THEME_LIGHT) === THEME_LIGHT, "resolveEffectiveTheme light");
 const furnitureImport = readFileSync(join(root, "src", "LocalFurnitureLibraryImport.js"), "utf8");
 assert(furnitureImport.includes("slugifyLibraryName"), "slugifyLibraryName exporté");

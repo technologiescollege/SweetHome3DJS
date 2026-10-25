@@ -1,10 +1,16 @@
 /**
- * Thème d’interface : clair / sombre / automatique (préférence système).
+ * UI theme: light / dark / system (OS preference).
+ *
+ * applyThemePreference() sets data-theme on <html> and dispatches
+ * "sweethome3d:themechange" so canvases (plan) can refresh colors.
  */
 
 export const THEME_LIGHT = "light";
 export const THEME_DARK = "dark";
 export const THEME_SYSTEM = "system";
+
+/** CustomEvent name fired after data-theme is updated. */
+export const THEME_CHANGE_EVENT = "sweethome3d:themechange";
 
 const STORAGE_KEY = "SweetHome3DJS.uiTheme";
 const VALID = new Set([THEME_LIGHT, THEME_DARK, THEME_SYSTEM]);
@@ -61,6 +67,13 @@ export function applyThemePreference(preference, options = {}) {
     document.documentElement.setAttribute("data-theme", effective);
     document.documentElement.setAttribute("data-theme-preference", pref);
     document.documentElement.style.colorScheme = effective;
+    try {
+      document.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, {
+        detail: { theme: effective, preference: pref },
+      }));
+    } catch (_) {
+      /* ignore */
+    }
   }
   if (options.persist !== false) {
     try {

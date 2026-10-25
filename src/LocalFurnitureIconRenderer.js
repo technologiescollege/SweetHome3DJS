@@ -25,7 +25,19 @@ function imageToPngBytes(image) {
   canvas.width = image.width || image.naturalWidth;
   canvas.height = image.height || image.naturalHeight;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#f1f3f5";
+  // Prefer theme tile color; fall back to light grey for off-DOM / Node.
+  let tile = "#f1f3f5";
+  try {
+    if (typeof getComputedStyle === "function" && typeof document !== "undefined") {
+      const cssTile = getComputedStyle(document.documentElement).getPropertyValue("--sh3d-tile").trim();
+      if (cssTile) {
+        tile = cssTile;
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  ctx.fillStyle = tile;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(image, 0, 0);
   const dataUrl = canvas.toDataURL("image/png");
@@ -88,7 +100,7 @@ async function renderModelNodeToPng(modelRoot, iconSize) {
   const canvas = document.createElement("canvas");
   canvas.width = iconSize;
   canvas.height = iconSize;
-  canvas.style.backgroundColor = "rgb(241, 243, 245)";
+  canvas.style.backgroundColor = "var(--sh3d-tile, #f1f3f5)";
 
   const canvas3D = new HTMLCanvas3D(canvas, true);
   canvas3D.setFieldOfView(Math.PI * 40 / 180);

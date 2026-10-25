@@ -1773,5 +1773,22 @@
   "UserPreferencesPanel.themeComboBox.system.text": "Automatique (système)",
   "SweetHome3DJSApplication.dropIgnored.title": "Type de fichier non pris en charge",
   "SweetHome3DJSApplication.dropIgnored.message": "Seuls les logements .sh3x / .sh3d peuvent être ouverts par glisser-déposer.",
-  "HomePane.IMPORT_FURNITURE_LIBRARY.SmallIcon": "resources/actions/furniture-import-library.svg"
+  "HomePane.IMPORT_FURNITURE_LIBRARY.SmallIcon": "resources/actions/furniture-import-library.svg",
+  "HomePane.SCRATCHOMISED_MENU.Name": "Scratchomised",
+  "HomePane.SCRATCHOMISED_START.Name": "Démarrer Scratchomised",
+  "HomePane.SCRATCHOMISED_START.ShortDescription": "Activer le bridge Scratchomised / electroBlockly",
+  "HomePane.SCRATCHOMISED_STOP.Name": "Arrêter Scratchomised",
+  "HomePane.SCRATCHOMISED_STOP.ShortDescription": "Arrêter le bridge Scratchomised",
+  "HomePane.SCRATCHOMISED_STATUS.Name": "État / meubles exposés…",
+  "HomePane.scratchomised.unavailable": "Scratchomised indisponible.",
+  "HomePane.scratchomised.started": "Scratchomised activé (ws://127.0.0.1:55125).\nMeubles exposés pour electroBlockly.",
+  "HomePane.scratchomised.stopped": "Scratchomised arrêté.",
+  "HomePane.scratchomised.statusHeader": "Scratchomised — %s",
+  "HomePane.scratchomised.furnitureCount": "Meubles exposés : %s",
+  "HomePane.scratchomised.apiHint": "API electroBlockly : window.SweetHome3DJS.plugins.scratchomised\n.getFurniture() / .getFurnitureMenuItems() / .setProperty()",
+  "HomePane.scratchomised.status.notInitialized": "Non initialisé",
+  "HomePane.scratchomised.status.connectedReady": "Connecté — Scratch prêt (objets synchronisés)",
+  "HomePane.scratchomised.status.connectedWaiting": "Connecté au bridge — en attente de Scratch (client_ready)",
+  "HomePane.scratchomised.status.reconnecting": "Déconnecté — reconnexion…",
+  "HomePane.scratchomised.status.stopped": "Arrêté"
 }

@@ -1967,5 +1967,22 @@
   "UserPreferencesPanel.themeComboBox.dark.text": "Dark",
   "UserPreferencesPanel.themeComboBox.system.text": "Automatic (system)",
   "SweetHome3DJSApplication.dropIgnored.title": "Unsupported file type",
-  "SweetHome3DJSApplication.dropIgnored.message": "Only .sh3x / .sh3d home files can be opened by drag-and-drop."
+  "SweetHome3DJSApplication.dropIgnored.message": "Only .sh3x / .sh3d home files can be opened by drag-and-drop.",
+  "HomePane.SCRATCHOMISED_MENU.Name": "Scratchomised",
+  "HomePane.SCRATCHOMISED_START.Name": "Start Scratchomised",
+  "HomePane.SCRATCHOMISED_START.ShortDescription": "Enable Scratchomised / electroBlockly bridge",
+  "HomePane.SCRATCHOMISED_STOP.Name": "Stop Scratchomised",
+  "HomePane.SCRATCHOMISED_STOP.ShortDescription": "Stop Scratchomised bridge",
+  "HomePane.SCRATCHOMISED_STATUS.Name": "Status / exposed furniture…",
+  "HomePane.scratchomised.unavailable": "Scratchomised is unavailable.",
+  "HomePane.scratchomised.started": "Scratchomised enabled (ws://127.0.0.1:55125).\nFurniture exposed for electroBlockly.",
+  "HomePane.scratchomised.stopped": "Scratchomised stopped.",
+  "HomePane.scratchomised.statusHeader": "Scratchomised — %s",
+  "HomePane.scratchomised.furnitureCount": "Exposed furniture: %s",
+  "HomePane.scratchomised.apiHint": "electroBlockly API: window.SweetHome3DJS.plugins.scratchomised\n.getFurniture() / .getFurnitureMenuItems() / .setProperty()",
+  "HomePane.scratchomised.status.notInitialized": "Not initialized",
+  "HomePane.scratchomised.status.connectedReady": "Connected — Scratch ready (objects synced)",
+  "HomePane.scratchomised.status.connectedWaiting": "Connected to bridge — waiting for Scratch (client_ready)",
+  "HomePane.scratchomised.status.reconnecting": "Disconnected — reconnecting…",
+  "HomePane.scratchomised.status.stopped": "Stopped"
 }
