@@ -5,8 +5,9 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/luxvitae-eco/SweetHome3DJS.git"
+    "url": "https://github.com/technologiescollege/SweetHome3DJS.git"
   },
+  "homepage": "https://technologiescollege.github.io/SweetHome3DJS/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

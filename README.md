@@ -1,10 +1,13 @@
 # SweetHome3DJS
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+[![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://technologiescollege.github.io/SweetHome3DJS/)
 
 ![SweetHome3DJS Screenshot](sweethome3djs-screenshot.jpg)
 
 [SweetHome3DJS][project-url] is a Vite / ESM / TypeScript fork of the Sweet Home 3D JS web editor (based on the [luxvitae-eco](https://github.com/luxvitae-eco/SweetHome3DJS) modernization of the official Space Mushrooms build).
+
+**Try it online:** [https://technologiescollege.github.io/SweetHome3DJS/](https://technologiescollege.github.io/SweetHome3DJS/)
 
 ## About
 
@@ -12,26 +15,37 @@ Sweet Home 3D helps you draw house plans, arrange furniture, and preview the res
 
 ## Status
 
-Usable for local editing of `.sh3x` / `.sh3d` files. Still evolving: the core remains a large JSweet-era codebase (`SweetHome3D.ts`), furniture import from the UI is not available (use the CLI), and some official online features are out of scope.
+Usable for local editing of `.sh3x` / `.sh3d` files. Still evolving: the core remains a large JSweet-era codebase (`SweetHome3D.ts`), and some official online features are out of scope.
 
 Working today:
 
 - Open / Save / Save as (download `.sh3x`)
 - Preferences + auto-recovery + resource cache in IndexedDB
-- Furniture catalogs via JSON (+ CLI `import-sh3f`)
+- Furniture catalogs via JSON + UI import (`.sh3f` / OBJ+MTL)
+- Theme Light / Dark / Automatic
+- Scratchomised bridge (local Node relay)
 - Checks: missing ESM imports + smoke `.sh3x`
+- Deploy to **GitHub Pages** via Actions (`main`)
 
 ## Getting started
 
-### Prerequisites
+### Online (GitHub Pages)
+
+Open [https://technologiescollege.github.io/SweetHome3DJS/](https://technologiescollege.github.io/SweetHome3DJS/) in a modern browser (Chrome / Edge recommended for File System Access).
+
+After each push to `main`, the [Deploy to GitHub Pages](.github/workflows/deploy.yml) workflow builds the app and publishes `dist/`. In the repo settings, **Pages → Source** must be **GitHub Actions**.
+
+> Note: the Scratchomised WebSocket bridge is not available on static Pages hosting; use a local `npm run dev` for Scratch / electroBlockly.
+
+### Prerequisites (local)
 
 - Node.js 18+
-- npm or pnpm
+- npm
 
-### Install & run
+### Install & run locally
 
 ```bash
-git clone https://github.com/luxvitae-eco/SweetHome3DJS.git
+git clone https://github.com/technologiescollege/SweetHome3DJS.git
 cd SweetHome3DJS
 npm install
 npm run dev
@@ -130,4 +144,4 @@ GNU GPL v2 — see [LICENSE](LICENSE). Same terms as Sweet Home 3D.
 - Original Sweet Home 3D / SweetHome3DJS by Emmanuel Puybaret / Space Mushrooms
 - [luxvitae-eco](https://github.com/luxvitae-eco) TypeScript / Vite refactoring
 
-[project-url]: https://github.com/luxvitae-eco/SweetHome3DJS
+[project-url]: https://github.com/technologiescollege/SweetHome3DJS
