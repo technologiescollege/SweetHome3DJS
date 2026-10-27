@@ -82,24 +82,49 @@ assert(wall3d.includes("import { ModelManager }"), "Wall3D importe ModelManager"
 assert(wall3d.includes("constructor(area, doorsOrWindows)"), "DoorOrWindowArea a un constructeur");
 
 const app = readFileSync(join(root, "src", "SweetHome3DJSApplication.js"), "utf8");
-assert(app.includes("localFileObjectUrl") || app.includes("stillLinked"), "Open local gère la révocation blob");
-assert(app.includes("openFromFile") && app.includes("openDroppedFile"), "Open local : openFromFile + openDroppedFile");
-assert(app.includes("pickHomeFileToOpen") && app.includes("writeBlobToFileHandle"), "Open/Save : File System Access API");
-assert(app.includes("confirmRecoverHome") && !app.includes("confirm(application.getUserPreferences"), "Auto-recovery via JSDialog (pas confirm natif)");
-assert(app.includes("local-save-as-name") || app.includes("pickHomeFileToSave"), "Save As local (dialogue ou FSA)");
-assert(app.includes("formatHomeOpenError") && app.includes("new JSDialog"), "Erreurs Open via JSDialog + formatHomeOpenError");
-assert(!/homeError:\s*function[^{]*\{[^}]*\balert\s*\(/.test(app.replace(/\s+/g, " ")), "Aucun alert dans homeError");
+const localFileCtrl = readFileSync(join(root, "src", "LocalFileHomeController.js"), "utf8");
+assert(
+  localFileCtrl.includes("localFileObjectUrl") || localFileCtrl.includes("stillLinked"),
+  "Open local gère la révocation blob"
+);
+assert(
+  localFileCtrl.includes("openFromFile") && localFileCtrl.includes("openDroppedFile"),
+  "Open local : openFromFile + openDroppedFile"
+);
+assert(
+  localFileCtrl.includes("pickHomeFileToOpen") && localFileCtrl.includes("writeBlobToFileHandle"),
+  "Open/Save : File System Access API"
+);
+assert(
+  app.includes("confirmRecoverHome") && !app.includes("confirm(application.getUserPreferences"),
+  "Auto-recovery via JSDialog (pas confirm natif)"
+);
+assert(
+  localFileCtrl.includes("local-save-as-name") || localFileCtrl.includes("pickHomeFileToSave"),
+  "Save As local (dialogue ou FSA)"
+);
+assert(
+  localFileCtrl.includes("formatHomeOpenError") && localFileCtrl.includes("new JSDialog"),
+  "Erreurs Open via JSDialog + formatHomeOpenError"
+);
+assert(
+  !/homeError:\s*function[^{]*\{[^}]*\balert\s*\(/.test(
+    (app + "\n" + localFileCtrl).replace(/\s+/g, " ")
+  ),
+  "Aucun alert dans homeError"
+);
+assert(app.includes("LocalFileHomeController"), "Application branche LocalFileHomeController");
 assert(existsSync(join(root, "src", "LocalFileAccess.js")), "LocalFileAccess.js présent");
 assert(existsSync(join(root, "src", "LocalFurnitureLibraryImport.js")), "LocalFurnitureLibraryImport.js présent");
 assert(existsSync(join(root, "src", "LocalFurnitureLibraryStore.js")), "LocalFurnitureLibraryStore.js présent");
-assert(
-  readFileSync(join(root, "src", "HomePane.js"), "utf8").includes("pickAndImportFurnitureLibrary"),
-  "HomePane branche l'import .sh3f local"
-);
 
 const homePane = readFileSync(join(root, "src", "HomePane.js"), "utf8");
+const homePaneFork = readFileSync(join(root, "src", "HomePaneFork.js"), "utf8");
+assert(
+  homePane.includes("installHomePaneFork") && homePaneFork.includes("pickAndImportFurnitureLibrary"),
+  "HomePane branche l'import .sh3f local"
+);
 assert(homePane.includes("showError(message)") && homePane.includes("#dialogBodyFromMessage"), "HomePane.showError via JSDialog");
-
 assert(existsSync(join(root, "src", "localizeDialogTemplates.js")), "localizeDialogTemplates.js présent");
 assert(existsSync(join(root, "src", "LocalFileHelpers.js")), "LocalFileHelpers.js présent");
 
@@ -159,8 +184,8 @@ assert(
   "meubles mal formés ignorés sans bloquer la bibliothèque"
 );
 assert(
-  readFileSync(join(root, "src", "URLContent.js"), "utf8").includes("BASE_URL") &&
-    readFileSync(join(root, "src", "URLContent.js"), "utf8").includes("lib/"),
+  readFileSync(join(root, "src", "LocalAppBase.js"), "utf8").includes("BASE_URL") &&
+    readFileSync(join(root, "src", "URLContent.js"), "utf8").includes("getLibFolderUrl"),
   "getScriptFolder respecte la base Vite (lib/resources)"
 );
 assert(
@@ -179,9 +204,15 @@ assert(existsSync(join(root, "scripts", "scratchomised-bridge.mjs")), "scratchom
 assert(existsSync(join(root, "public", "scratchomised", "Scratchomised.js")), "extension Scratchomised.js servie");
 assert(existsSync(join(root, "public", "lib", "resources", "actions", "scratchomised-start.svg")), "icône start Scratchomised");
 assert(existsSync(join(root, "public", "lib", "resources", "actions", "scratchomised-stop.svg")), "icône stop Scratchomised");
-assert(homePane.includes("initScratchomisedOnHomePane"), "HomePane branche Scratchomised");
-assert(homePane.includes("createScratchomisedToggleButton"), "toolbar Scratchomised start/stop");
 assert(
+  homePane.includes("installHomePaneFork") && homePaneFork.includes("initScratchomisedOnHomePane"),
+  "HomePane branche Scratchomised"
+);
+assert(
+  homePane.includes("createScratchomisedToggleButton") &&
+    homePaneFork.includes("createScratchomisedToggleButton"),
+  "toolbar Scratchomised start/stop"
+);assert(
   readFileSync(join(root, "src", "scratchomised", "ScratchomisedHomePane.js"), "utf8").includes("installScratchomisedPlugin"),
   "plugin exposé pour electroBlockly"
 );
