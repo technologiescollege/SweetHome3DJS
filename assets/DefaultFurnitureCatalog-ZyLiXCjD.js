@@ -1,0 +1,1 @@
+export{t as DefaultFurnitureCatalog}from"./DefaultFurnitureCatalog-CCfHobas.js";
