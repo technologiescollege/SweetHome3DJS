@@ -1215,7 +1215,6 @@ DefaultFurnitureCatalog.PropertyKey = {
         return key;
       }
     }
-    // eslint-disable-next-line no-undef -- @todo Import this
     throw new IllegalArgumentException("Unknow prefix " + keyPrefix);
   }
 }

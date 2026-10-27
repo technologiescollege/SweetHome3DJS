@@ -142,9 +142,7 @@ export class DimensionLine3D extends Object3DBranch {
       }
 
       let elevationStart = dimensionLine.getElevationStart();
-      // eslint-disable-next-line no-undef -- @todo Import this
       let startPointTransform = mat4.create();
-      // eslint-disable-next-line no-undef -- @todo Import this
       mat4.fromTranslation(startPointTransform, vec3.fromValues(
         dimensionLine.getXStart(), dimensionLine.getLevel() != null ? dimensionLine.getLevel().getElevation() + elevationStart : elevationStart, dimensionLine.getYStart()));
 

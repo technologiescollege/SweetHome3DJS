@@ -221,11 +221,11 @@ export function createScratchomisedToggleButton(homePane, additionalClass) {
 
   const img = document.createElement("img");
   img.alt = "";
-  img.width = 20;
-  img.height = 20;
+  img.width = 16;
+  img.height = 16;
   img.draggable = false;
   img.style.display = "block";
-  img.style.margin = "0 auto";
+  img.style.margin = "0";
   img.style.pointerEvents = "none";
   button.appendChild(img);
 

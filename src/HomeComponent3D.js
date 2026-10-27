@@ -1841,7 +1841,7 @@ export class HomeComponent3D {
    * @return {Selectable}
    */
   getClosestSelectableItemAt(x, y) {
-    let rect = component3D.canvas3D.getHTMLElement().getBoundingClientRect();
+    let rect = this.canvas3D.getHTMLElement().getBoundingClientRect();
     return this.getClosestItemAt(x + rect.left, y + rect.top);
   }
 

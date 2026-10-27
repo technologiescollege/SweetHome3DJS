@@ -36,13 +36,10 @@ import { AbstractAction } from './graphics2d';
 import { OperatingSystem } from './URLContent';
 import { ZIPTools } from './URLContent';
 import { TextureManager } from './TextureManager';
-import { pickAndImportFurnitureLibrary } from './LocalFurnitureLibraryImport';
 import {
-  initScratchomisedOnHomePane,
-  createScratchomisedActions as createScratchomisedActionsImpl,
-  createScratchomisedToggleButton as createScratchomisedToggleButtonImpl,
-  addScratchomisedMenu as addScratchomisedMenuImpl,
-} from './scratchomised/ScratchomisedHomePane';
+  installHomePaneFork,
+  showImportFurnitureLibraryDialogFork,
+} from './HomePaneFork.js';
 
 /**
  * Creates home view associated with its controller.
@@ -78,9 +75,8 @@ export class HomePane {
     this.addPlanControllerListener(controller.getPlanController());
     this.addFocusListener();
 
-    // Scratchomised bridge UI + window.SweetHome3DJS.plugins.scratchomised API
-    // (implementation lives in src/scratchomised/ScratchomisedHomePane.js).
-    initScratchomisedOnHomePane(this, home);
+    // Fork UI (Scratchomised + local furniture import) — see HomePaneFork.js
+    installHomePaneFork(this, home);
 
     this.createToolBar(home, preferences, controller);
     this.createPopupMenus(home, preferences);
@@ -1368,34 +1364,6 @@ export class HomePane {
   }
 
   /**
-   * Scratchomised start/stop actions (see src/scratchomised/ScratchomisedHomePane.js).
-   * @private
-   */
-  createScratchomisedActions() {
-    createScratchomisedActionsImpl(this);
-  }
-
-  /**
-   * Toolbar toggle for the Scratchomised bridge.
-   * @param {string} [additionalClass]
-   * @return {HTMLButtonElement|null}
-   * @private
-   */
-  createScratchomisedToggleButton(additionalClass) {
-    return createScratchomisedToggleButtonImpl(this, additionalClass);
-  }
-
-  /**
-   * Appends Scratchomised Start / Stop / Status items to a popup menu.
-   * @param {*} builder
-   * @param {{ noSeparator?: boolean }} [options]
-   * @private
-   */
-  addScratchomisedMenu(builder, options) {
-    addScratchomisedMenuImpl(this, builder, options);
-  }
-
-  /**
    * Initializes pane splitters.
    * @private
    */
@@ -2439,44 +2407,7 @@ export class HomePane {
    * @ignore
    */
   showImportFurnitureLibraryDialog() {
-    // Flux asynchrone local (.sh3f / ZIP OBJ+MTL / multi-fichiers).
-    const homePane = this;
-    const preferences = this.preferences;
-    pickAndImportFurnitureLibrary(preferences, {
-      confirmReplace: (slug) => homePane.confirmReplaceFurnitureLibrary(slug),
-      showMessage: (result) => {
-        const name = (result && (result.displayName || result.slug)) || "";
-        const count = result && result.pieceCount != null ? result.pieceCount : "";
-        let message;
-        try {
-          message = preferences.getLocalizedString(
-            "HomeController",
-            "importedFurnitureLibraryMessage",
-            name
-          );
-        } catch (_) {
-          message = "Meubles importés : " + name;
-        }
-        if (count !== "") {
-          message += " — " + count + " meuble(s)";
-        }
-        homePane.showMessage(message);
-      },
-      showError: (error) => {
-        let message;
-        try {
-          message = preferences.getLocalizedString(
-            "HomeController",
-            "importFurnitureLibraryError",
-            error && error.message ? error.message : String(error)
-          );
-        } catch (_) {
-          message = "Erreur d'import : " + (error && error.message ? error.message : error);
-        }
-        homePane.showError(message);
-      },
-    });
-    return null;
+    return showImportFurnitureLibraryDialogFork(this);
   }
 
   /**

@@ -25,7 +25,16 @@ Working today:
 - Theme Light / Dark / Automatic
 - Scratchomised bridge (local Node relay)
 - Checks: missing ESM imports + smoke `.sh3x`
-- Deploy to **GitHub Pages** via Actions (`main`)
+- Deploy to **GitHub Pages** via Actions (`dev` → build → `gh-pages`)
+
+## Branches
+
+| Branch | Role |
+|--------|------|
+| **`dev`** | Seule branche de travail / défaut (port amont, features fork) |
+| **`gh-pages`** | Site statique généré par Actions (ne pas y committer à la main) |
+
+La branche `main` n’est plus utilisée.
 
 ## Getting started
 
@@ -39,7 +48,7 @@ Open [https://technologiescollege.github.io/SweetHome3DJS/](https://technologies
 2. **Build and deployment → Source**: *Deploy from a branch*
 3. Branch **`gh-pages`** / folder **`/`** → Save
 
-Each push to `main` runs [Deploy to GitHub Pages](.github/workflows/deploy.yml): build → publish `dist/` on `gh-pages`.
+Each push to **`dev`** runs [Deploy to GitHub Pages](.github/workflows/deploy.yml): build → publish `dist/` on `gh-pages`.
 
 > Note: the Scratchomised WebSocket bridge is not available on static Pages hosting; use a local `npm run dev` for Scratch / electroBlockly.
 

@@ -2,6 +2,58 @@
 
 Ce fork (Vite / ESM / TypeScript) **n’est pas synchronisé automatiquement** avec l’officiel Space Mushrooms. Chaque nouvelle version se porte à la main.
 
+## Politique pour rester portable (objectif sync SF)
+
+Priorité : pouvoir reporter une release [SweetHome3DJS-source](https://sourceforge.net/projects/sweethome3d/files/SweetHome3DJS-source/) avec un **diff fichier à fichier**, pas une réécriture.
+
+### Garder « amont-friendly » (ne pas TS-ifier / ne pas y mettre de features fork)
+
+Fichiers issus de l’officiel (vues, 3D, loaders, toolkit, catalogues UI, etc.) :
+
+- Rester en **`.js` ESM** (imports/exports Vite ok).
+- **Pas** de conversion TypeScript profonde, pas de refactor structurel « pour le plaisir ».
+- **Pas** d’UI / logique fork collée au milieu (`scratchomised`, import meubles local, thème, Open/Save FS…) — seulement de minces appels vers des modules `Local*` / `scratchomised/*`.
+- Correctifs bugs amont : patch **minimal** + note dans le commit / changelog de port.
+
+### Isoler le fork (TS ou JS dédié, hors arbres SF)
+
+| Zone | Emplacement cible |
+|------|-------------------|
+| Open / Save local, FS Access | `LocalFileAccess.js`, `LocalFileHelpers.js`, `LocalFileHomeController.js` (hors de `SweetHome3DJSApplication.js`) |
+| Cache IndexedDB ressources | `LocalResourceCache.js`, helpers URL — pas éparpillés dans chaque loader |
+| Import `.sh3f` / OBJ local | `LocalFurniture*.js` |
+| Thème Light/Dark | `ThemeManager.js` + `main.ts` |
+| Scratchomised | `src/scratchomised/*` (+ hooks 1–3 lignes dans `HomePane.js`) |
+| Bootstrap Vite | `main.ts`, `index.html`, `vite.config.ts` |
+
+### Cœur JSweet (`SweetHome3D.ts`)
+
+- Rester un **port manuel** depuis `SweetHome3D.js` / `lib/generated` officiel.
+- Ne pas attendre un merge auto ; porter commit-par-commit / hunk-par-hunk la logique amont.
+- Éviter d’y coller des features fork : préférer sous-classes / wrappers (`LocalFileHomeController`, etc.).
+
+### Checklist avant de toucher un fichier « officiel »
+
+1. Est-ce que ça existe dans SweetHome3DJS-source ? → **oui** : patch minimal, rester JS.
+2. Est-ce une feature fork ? → **nouveau module** `Local*` / `scratchomised/*`, pas d’édition massive du fichier amont.
+3. Après port SF : `npm run diff-official`, puis `npm run check` / smoke `.sh3x`.
+
+### Inventaire des écarts volontaires (à rejouer après un port)
+
+| Fichier amont | Écart fork (minimal) | Module dédié |
+|---------------|----------------------|--------------|
+| `SweetHome3DJSApplication.js` | branche `createHomeController` → local | `LocalFileHomeController.js` |
+| `HomePane.js` | `installHomePaneFork` + délégation import bibliothèque | `HomePaneFork.js` |
+| `URLContent.js` | `ZIPTools.getScriptFolder` → base Vite | `LocalAppBase.js` |
+| `HomeRecorder.js` | `JSZip` npm + `createWriteHomeWorker()` | `JSZipShim.js`, `createWriteHomeWorker.js` |
+| `PlanComponent.js` | `installThemeChangeListener` (+ dispose) | `ThemeManager.js` |
+| `JSViewFactory.js` | 2 appels thème préférences | `PreferencesThemeUI.js` |
+| `RecordedUserPreferences.js` | theme load/persist + import meubles | `PreferencesThemeUI.js`, `LocalFurniture*` |
+| Recorders / `URLContent` IndexedDB | **souvent déjà amont** (online SH3DJS) — ne pas « extraire » | — |
+| `FurnitureCatalogListPanel.js` | micro-opti commentaire / placeholder | laisser tel quel |
+
+Modules 100 % fork (pas dans SF) : `LocalFile*`, `LocalFurniture*`, `LocalResourceCache.js`, `ThemeManager.js`, `PreferencesThemeUI.js`, `HomePaneFork.js`, `LocalAppBase.js`, `HomeRecorder/createWriteHomeWorker.js`, `scratchomised/*`, `main.ts`.
+
 ## Sources officielles
 
 | Ressource | URL |

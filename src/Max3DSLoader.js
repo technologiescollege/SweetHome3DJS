@@ -357,8 +357,8 @@ export class Max3DSLoader extends ModelLoader {
    * Returns the content of the model stored in the given entry.
    * @protected
    */
-  getModelContent(modelEntry) {
-    return modelEntry.asUint8Array();
+  async getModelContent(modelEntry) {
+    return modelEntry.async("uint8array");
   }
 
   /**

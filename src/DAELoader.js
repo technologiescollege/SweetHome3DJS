@@ -913,9 +913,9 @@ class DAEHandler extends DefaultHandler {
           for (let k = 0; k < stripCount - 1; k++) {
             noStripCoordinatesIndices.push(coordinatesIndices[index + k]);
             noStripCoordinatesIndices.push(coordinatesIndices[index + k + 1]);
-            if (textureCoordinateIndices.length > 0) {
-              noStripTextureCoordinatesIndices.push(textureCoordinateIndices[index + k]);
-              noStripTextureCoordinatesIndices.push(textureCoordinateIndices[index + k + 1]);
+            if (textureCoordinatesIndices.length > 0) {
+              noStripTextureCoordinatesIndices.push(textureCoordinatesIndices[index + k]);
+              noStripTextureCoordinatesIndices.push(textureCoordinatesIndices[index + k + 1]);
             }
           }
           index += stripCount;

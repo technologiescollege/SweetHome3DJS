@@ -54,10 +54,9 @@ import { TextureManager } from './TextureManager';
 import { LengthUnit } from './LengthUnit';
 import { CoreTools } from './CoreTools';
 import {
-  applyThemePreference,
-  getStoredThemePreference,
-  normalizeThemePreference,
-} from './ThemeManager';
+  wirePreferencesThemeSelect,
+  commitPreferencesTheme,
+} from './PreferencesThemeUI.js';
 import { DecimalFormat, IntegerFormat, } from './core';
 import { ModelPreviewComponent } from './ModelPreviewComponent';
 import { TextureChoiceComponent } from './TextureChoiceComponent';
@@ -730,7 +729,9 @@ export class JSViewFactory {
               component.repaintOriginCanvas();
             },
             textureError: function (error) {
-              imageErrorListener(error);
+              console.warn("Error loading image: " + error);
+              component.controller.setImage(null);
+              component.setImageChoiceTexts();
             }
           });
         }
@@ -1246,15 +1247,7 @@ export class JSViewFactory {
             let selectedLanguageOption = dialog.languageSelect.options[dialog.languageSelect.selectedIndex];
             controller.setLanguage(selectedLanguageOption != null ? selectedLanguageOption.value : null);
           }
-          if (dialog.themeSelect != null && isElementVisible(dialog.themeSelect)) {
-            let selectedThemeOption = dialog.themeSelect.options[dialog.themeSelect.selectedIndex];
-            const themeValue = selectedThemeOption != null ? selectedThemeOption.value : "system";
-            dialog._themeCommitted = true;
-            if (typeof preferences.setUiTheme === "function") {
-              preferences.setUiTheme(themeValue);
-            }
-            applyThemePreference(themeValue, { persist: true });
-          }
+          commitPreferencesTheme(dialog, preferences, isElementVisible);
           if (isElementVisible(dialog.furnitureCatalogViewTreeRadioButton)) {
             controller.setFurnitureCatalogViewedInTree(dialog.furnitureCatalogViewTreeRadioButton.checked);
           }
@@ -1351,42 +1344,8 @@ export class JSViewFactory {
       disablePreferenceRow(dialog.languageSelect);
     }
 
-    // THEME (clair / sombre / système) — extension locale SweetHome3DJS
-    dialog.themeSelect = dialog.getElement("theme-select");
-    if (dialog.themeSelect != null) {
-      dialog._themeCommitted = false;
-      const currentTheme = normalizeThemePreference(
-        typeof preferences.getUiTheme === "function"
-          ? preferences.getUiTheme()
-          : getStoredThemePreference());
-      const themeOptions = [
-        ["light", preferences.getLocalizedString("UserPreferencesPanel", "themeComboBox.light.text") || "Light"],
-        ["dark", preferences.getLocalizedString("UserPreferencesPanel", "themeComboBox.dark.text") || "Dark"],
-        ["system", preferences.getLocalizedString("UserPreferencesPanel", "themeComboBox.system.text") || "System"],
-      ];
-      for (let t = 0; t < themeOptions.length; t++) {
-        dialog.themeSelect.appendChild(
-          JSComponent.createOptionElement(themeOptions[t][0], themeOptions[t][1], themeOptions[t][0] === currentTheme));
-      }
-      dialog.registerEventListener(dialog.themeSelect, "change", () => {
-        const opt = dialog.themeSelect.options[dialog.themeSelect.selectedIndex];
-        if (opt != null) {
-          applyThemePreference(opt.value, { persist: false });
-        }
-      });
-      const previousBehaviorDisposer = dialog.disposer;
-      dialog.disposer = (d) => {
-        if (!dialog._themeCommitted) {
-          const restore = typeof preferences.getUiTheme === "function"
-            ? preferences.getUiTheme()
-            : getStoredThemePreference();
-          applyThemePreference(restore, { persist: false });
-        }
-        if (typeof previousBehaviorDisposer === "function") {
-          previousBehaviorDisposer(d);
-        }
-      };
-    }
+    // THEME — fork (see PreferencesThemeUI.js)
+    wirePreferencesThemeSelect(dialog, preferences, JSComponent);
 
     // UNIT
     dialog.unitSelect = dialog.getElement("unit-select");
@@ -4210,7 +4169,7 @@ export class JSViewFactory {
       } else if (controller.getOrientation() == DimensionLineController.DimensionLineOrientation.ELEVATION) {
         dialog.elevationDimensionLineRadioButton.checked = true;
       }
-      orientable = controller.isEditableDistance();
+      let orientable = controller.isEditableDistance();
       dialog.planDimensionLineRadioButton.disabled = !orientable;
       dialog.elevationDimensionLineRadioButton.disabled = !orientable;
 

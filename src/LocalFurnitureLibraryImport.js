@@ -5,7 +5,7 @@
  * - ensemble de fichiers (.obj / .mtl / images / plusieurs ZIP)
  * → IndexedDB + fusion dans le catalogue meubles actif.
  */
-import JSZip from "jszip";
+import JSZip from "./JSZipShim.js";
 import {
   furnitureLibraryExists,
   getFurnitureLibrary,
@@ -177,8 +177,8 @@ function escapePropertiesValue(value) {
     });
 }
 
-function readPropertiesText(zipFile) {
-  const bytes = zipFile.asUint8Array();
+async function readPropertiesText(zipFile) {
+  const bytes = await zipFile.async("uint8array");
   return new TextDecoder("latin1").decode(bytes);
 }
 
@@ -394,18 +394,22 @@ function createPlaceholderIconBytes(label) {
  * @param {JSZip} zip
  * @return {{objPath: string, name: string, iconPath: string|null, dims: {width:number,depth:number,height:number}}[]}
  */
-export function discoverObjModels(zip) {
+export async function discoverObjModels(zip) {
   const objs = listObjEntries(zip);
-  return objs.map((objPath) => {
+  const result = [];
+  for (const objPath of objs) {
     const entry = zip.file(objPath);
-    const text = entry ? new TextDecoder("utf-8").decode(entry.asUint8Array()) : "";
-    return {
+    const text = entry
+      ? new TextDecoder("utf-8").decode(await entry.async("uint8array"))
+      : "";
+    result.push({
       objPath,
       name: prettyModelName(objPath),
       iconPath: findIconNear(zip, objPath),
       dims: estimateDimensionsFromObj(text),
-    };
-  });
+    });
+  }
+  return result;
 }
 
 function buildCatalogPropertiesText(pieces, meta = {}) {
@@ -440,13 +444,13 @@ function buildCatalogPropertiesText(pieces, meta = {}) {
 /**
  * Copie les entrées d'un ZIP source sous un préfixe dans le ZIP cible.
  */
-function copyZipEntries(targetZip, sourceZip, prefix) {
+async function copyZipEntries(targetZip, sourceZip, prefix) {
   const map = new Map();
   for (const name of listFileNames(sourceZip)) {
     const dest = normalizeZipPath(prefix ? prefix + "/" + name : name);
     const file = sourceZip.file(name);
     if (!file) continue;
-    targetZip.file(dest, file.asUint8Array());
+    targetZip.file(dest, await file.async("uint8array"));
     map.set(name, dest);
   }
   return map;
@@ -484,14 +488,14 @@ export async function enrichSh3fWithModelIcons(sh3fBuffer) {
     return sh3fBuffer;
   }
 
-  const zip = new JSZip(sh3fBuffer);
+  const zip = await JSZip.loadAsync(sh3fBuffer);
   const propPath = listPropertyFiles(zip).find((n) =>
     /(^|\/)PluginFurnitureCatalog\.properties$/i.test(n)
   );
   if (!propPath) {
     return sh3fBuffer;
   }
-  const props = parseProperties(readPropertiesText(zip.file(propPath)));
+  const props = parseProperties(await readPropertiesText(zip.file(propPath)));
   const indices = Object.keys(props)
     .filter((k) => /^model#\d+$/.test(k))
     .map((k) => parseInt(k.slice(k.indexOf("#") + 1), 10))
@@ -559,7 +563,7 @@ export async function enrichSh3fWithModelIcons(sh3fBuffer) {
   // Réécrit les propriétés si des chemins d'icônes ont été ajoutés
   zip.file(propPath, buildCatalogPropertiesTextFromProps(props));
 
-  const bytes = zip.generate({ type: "uint8array" });
+  const bytes = await zip.generateAsync({ type: "uint8array" });
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 
@@ -615,14 +619,14 @@ function buildCatalogPropertiesTextFromProps(props) {
  * @return {Promise<ArrayBuffer>}
  */
 export async function synthesizeSh3fFromObjZip(zip, meta = {}) {
-  const discovered = discoverObjModels(zip);
+  const discovered = await discoverObjModels(zip);
   if (discovered.length === 0) {
     throw new Error("Aucun fichier .obj trouvé dans l'archive");
   }
 
   const out = new JSZip();
   const prefix = meta.pathPrefix ? normalizeZipPath(meta.pathPrefix) : "";
-  const pathMap = copyZipEntries(out, zip, prefix);
+  const pathMap = await copyZipEntries(out, zip, prefix);
 
   let pieces = discovered.map((d, i) => ({
     id: (meta.idPrefix || "Local#import") + "-" + (i + 1),
@@ -646,7 +650,7 @@ export async function synthesizeSh3fFromObjZip(zip, meta = {}) {
     })
   );
 
-  const bytes = out.generate({ type: "uint8array" });
+  const bytes = await out.generateAsync({ type: "uint8array" });
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   return enrichSh3fWithModelIcons(buffer);
 }
@@ -662,13 +666,14 @@ export async function mergeObjArchivesToSh3f(archives, meta = {}) {
   const allPieces = [];
   let pieceCounter = 0;
 
-  archives.forEach((arch, archIndex) => {
-    const src = new JSZip(arch.buffer);
-    const models = discoverObjModels(src);
-    if (models.length === 0) return;
+  for (let archIndex = 0; archIndex < archives.length; archIndex++) {
+    const arch = archives[archIndex];
+    const src = await JSZip.loadAsync(arch.buffer);
+    const models = await discoverObjModels(src);
+    if (models.length === 0) continue;
     const prefix = "import/" + slugifyLibraryName(arch.name || "set-" + (archIndex + 1));
-    const pathMap = copyZipEntries(out, src, prefix);
-    models.forEach((d) => {
+    const pathMap = await copyZipEntries(out, src, prefix);
+    for (const d of models) {
       pieceCounter++;
       allPieces.push({
         id: "Local#import-" + pieceCounter,
@@ -679,8 +684,8 @@ export async function mergeObjArchivesToSh3f(archives, meta = {}) {
         dims: d.dims,
         creator: "Import local",
       });
-    });
-  });
+    }
+  }
 
   if (allPieces.length === 0) {
     throw new Error("Aucun modèle OBJ trouvé dans la sélection");
@@ -696,7 +701,7 @@ export async function mergeObjArchivesToSh3f(archives, meta = {}) {
     })
   );
 
-  const bytes = out.generate({ type: "uint8array" });
+  const bytes = await out.generateAsync({ type: "uint8array" });
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   return enrichSh3fWithModelIcons(buffer);
 }
@@ -719,7 +724,7 @@ export async function packLooseModelFiles(files) {
   if (objCount === 0) {
     throw new Error("Sélectionnez au moins un fichier .obj (avec ses .mtl / textures)");
   }
-  const bytes = zip.generate({ type: "uint8array" });
+  const bytes = await zip.generateAsync({ type: "uint8array" });
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 
@@ -730,7 +735,7 @@ export async function packLooseModelFiles(files) {
  * @return {Promise<ArrayBuffer>}
  */
 async function ensureSh3fBuffer(arrayBuffer, meta = {}) {
-  const zip = new JSZip(arrayBuffer);
+  const zip = await JSZip.loadAsync(arrayBuffer);
   if (hasFurnitureCatalog(zip)) {
     return arrayBuffer;
   }
@@ -740,7 +745,7 @@ async function ensureSh3fBuffer(arrayBuffer, meta = {}) {
   if (sh3fEntries.length > 0) {
     const entry = sh3fEntries[0];
     const file = zip.file(entry);
-    const bytes = file.asUint8Array();
+    const bytes = await file.async("uint8array");
     const nested = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     return ensureSh3fBuffer(nested, meta);
   }
@@ -769,7 +774,7 @@ export async function parseFurnitureLibraryFile(file, options = {}) {
   const slug = slugifyLibraryName(options.slug || displayName);
   const buffer = await file.arrayBuffer();
   const sh3fBuffer = await ensureSh3fBuffer(buffer, { displayName });
-  const zip = new JSZip(sh3fBuffer);
+  const zip = await JSZip.loadAsync(sh3fBuffer);
   const propertyFiles = listPropertyFiles(zip);
   if (propertyFiles.length === 0) {
     throw new Error("Aucun PluginFurnitureCatalog*.properties trouvé dans le .sh3f");
@@ -780,7 +785,7 @@ export async function parseFurnitureLibraryFile(file, options = {}) {
   let pieceCount = 0;
 
   for (const propPath of propertyFiles) {
-    const text = readPropertiesText(zip.file(propPath));
+    const text = await readPropertiesText(zip.file(propPath));
     const parsed = parseProperties(text);
     const relative = rewriteCatalogPathsRelative(parsed, zip.files);
     const localeMatch = propPath.match(/PluginFurnitureCatalog(_[a-zA-Z0-9_]+)?\.properties$/i);
@@ -825,9 +830,9 @@ export async function parseFurnitureLibraryFile(file, options = {}) {
  * @param {ArrayBuffer} buffer
  * @return {"sh3f"|"obj"|"unknown"}
  */
-export function detectFurnitureArchiveKind(buffer) {
+export async function detectFurnitureArchiveKind(buffer) {
   try {
-    const zip = new JSZip(buffer);
+    const zip = await JSZip.loadAsync(buffer);
     if (hasFurnitureCatalog(zip)) return "sh3f";
     if (listFileNames(zip).some((n) => /\.sh3f$/i.test(n))) return "sh3f";
     if (listObjEntries(zip).length > 0) return "obj";
@@ -869,7 +874,7 @@ export async function parseFurnitureImportSelection(files, options = {}) {
 
   for (const file of archiveFiles) {
     const buffer = await file.arrayBuffer();
-    const kind = detectFurnitureArchiveKind(buffer);
+    const kind = await detectFurnitureArchiveKind(buffer);
     if (kind === "obj") {
       objArchives.push({ name: file.name, buffer, kind });
     } else if (kind === "sh3f") {

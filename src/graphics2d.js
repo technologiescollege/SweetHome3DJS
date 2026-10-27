@@ -745,7 +745,7 @@ export class AbstractAction {
    */
   getPropertyChangeListeners() {
     if (this.changeSupport == null) {
-      return new PropertyChangeListener[0];
+      return [];
     }
     return this.changeSupport.getPropertyChangeListeners();
   }

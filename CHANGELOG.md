@@ -11,6 +11,24 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.0] — 2026-10-27
+
+### Added
+
+- TypeScript **7.0** typecheck clean on `SweetHome3D.ts`
+- Fork isolation modules for easier upstream ports: `LocalFileHomeController`, `HomePaneFork`, `LocalAppBase`, `PreferencesThemeUI`, `createWriteHomeWorker`
+- Sync policy documented in `scripts/sync-official.md`
+
+### Changed
+
+- Deploy GitHub Pages from **`dev`** (removed unused `main` branch); `gh-pages` remains the published static site
+- ESLint tuned for legacy SH3DJS view code (fewer false positives); fixed real `no-undef` bugs
+- Extract Open/Save, Scratchomised, theme preferences wiring out of official-looking files
+
+### Notes
+
+- Remaining ESLint warnings are mostly unused locals in upstream JS — fix opportunistically on SourceForge ports.
+
 ## [1.0.0] — 2026-10-25
 
 ### Added

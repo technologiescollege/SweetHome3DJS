@@ -117,3 +117,13 @@ export function initThemeFromStorage() {
   applyThemePreference(getStoredThemePreference(), { persist: false });
   watchSystemTheme(getStoredThemePreference);
 }
+
+/**
+ * Subscribe to theme changes (plan canvas, etc.).
+ * @param {EventListener} listener
+ * @returns {() => void} unsubscribe
+ */
+export function installThemeChangeListener(listener) {
+  document.addEventListener(THEME_CHANGE_EVENT, listener);
+  return () => document.removeEventListener(THEME_CHANGE_EVENT, listener);
+}

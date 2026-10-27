@@ -12,6 +12,8 @@ import {
     watchSystemTheme,
     getStoredThemePreference,
 } from "./ThemeManager.js";
+import { CoreTools } from "./CoreTools.js";
+import { Locale } from "./core.js";
 import './style.css';
 
 // Appliquer le thème immédiatement (localStorage) pour éviter un flash.
@@ -22,8 +24,22 @@ var urlBase = window.location.href.substring(
     window.location.href.lastIndexOf("/") + 1
 );
 
-// Mode fichier local : pas de readHomeURL → LocalFileHomeController
-// (Open = sélecteur de fichier, Save = téléchargement .sh3x).
+// Prefetch i18n / catalogues en async pour éviter les XHR sync (warning Firefox).
+await CoreTools.preloadResourceBundleBases(
+    [
+        "resources/localization",
+        "resources/DefaultFurnitureCatalog",
+        "resources/DefaultTexturesCatalog",
+        "resources/Trees",
+        urlBase + "lib/resources/DefaultFurnitureCatalog",
+        urlBase + "lib/resources/DefaultTexturesCatalog",
+        urlBase + "lib/resources/Trees",
+    ],
+    Locale.getDefault()
+);
+
+// Mode fichier local : pas de readHomeURL → LocalFileHomeController.js
+// (Open = sélecteur / FSA, Save = handle ou téléchargement .sh3x).
 // Préférences + auto-recovery en IndexedDB (sans PHP).
 var application = new SweetHome3DJSApplication({
     writePreferencesURL:

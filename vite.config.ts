@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import eslint from 'vite-plugin-eslint';
-import { scratchomisedBridgePlugin } from './vite-plugin-scratchomised';
+import { scratchomisedBridgePlugin } from './vite-plugin-scratchomised.ts';
 
 export default defineConfig(({ mode }: { mode: string }) => ({
   base: mode === 'production' ? '/SweetHome3DJS/' : '/',

@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-import JSZip from 'jszip';
+import JSZip from '../JSZipShim.js';
 import { SAXParser } from '@flyskypie/xml-sax-parser';
 
 import { HomeXMLHandler, XMLWriter, HomeXMLExporter } from '../SweetHome3D';
@@ -34,7 +34,7 @@ import { CoreTools } from '../CoreTools';
 import { ZIPTools } from '../URLContent';
 import { DefaultUserPreferences } from '../UserPreferences';
 
-import WriteHomeWorker from './WriteHomeWorker?worker';
+import { createWriteHomeWorker } from './createWriteHomeWorker.js';
 
 /**
  * @typedef {Object} IConfiguration
@@ -89,31 +89,31 @@ export class HomeRecorder {
 
     ZIPTools.getZIP(url, {
       zipReady: function (zip) {
-        try {
-          let homeXmlEntry = zip.file(homeEntryName);
-          if (homeXmlEntry !== null) {
-            // An observer which will replace home contents by permanent content or content in cache if it exists
-            let contentObserver = {
-              homeLoaded: function (home) {
-                recorder.replaceHomeContents(home, url, observer);
-              },
-              homeError: function (error) {
-                if (observer.homeError !== undefined) {
-                  observer.homeError(error);
-                }
-              },
-              progression: function (part, info, percentage) {
-                if (observer.progression !== undefined) {
-                  observer.progression(percentage);
-                }
+        let homeXmlEntry = zip.file(homeEntryName);
+        if (homeXmlEntry !== null) {
+          // An observer which will replace home contents by permanent content or content in cache if it exists
+          let contentObserver = {
+            homeLoaded: function (home) {
+              recorder.replaceHomeContents(home, url, observer);
+            },
+            homeError: function (error) {
+              if (observer.homeError !== undefined) {
+                observer.homeError(error);
               }
-            };
-            recorder.parseHomeXMLEntry(homeXmlEntry, zip, url, contentObserver);
-          } else {
-            this.zipError(new Error("No " + homeEntryName + " entry in " + url));
-          }
-        } catch (ex) {
-          this.zipError(ex);
+            },
+            progression: function (part, info, percentage) {
+              if (observer.progression !== undefined) {
+                observer.progression(percentage);
+              }
+            }
+          };
+          recorder.parseHomeXMLEntry(homeXmlEntry, zip, url, contentObserver).catch((ex) => {
+            if (observer.homeError !== undefined) {
+              observer.homeError(ex);
+            }
+          });
+        } else {
+          this.zipError(new Error("No " + homeEntryName + " entry in " + url));
         }
       },
       zipError: function (error) {
@@ -133,8 +133,8 @@ export class HomeRecorder {
    * Parses the content of the given entry to create the home object it contains. 
    * @private
    */
-  parseHomeXMLEntry(homeXmlEntry, zip, zipUrl, observer) {
-    let xmlContent = homeXmlEntry.asText();
+  async parseHomeXMLEntry(homeXmlEntry, zip, zipUrl, observer) {
+    let xmlContent = await homeXmlEntry.async("string");
     if (observer.progression !== undefined) {
       observer.progression(HomeRecorder.READING_HOME, homeXmlEntry.name, 1);
 
@@ -466,8 +466,12 @@ export class HomeRecorder {
                       recorder.writeHomeZipEntries(contentZipOut, "", homeContent, {
                         blobContentEntryName: contentEntryName.substring(slashIndex + 1),
                         contentSaved: function (homeContent) {
-                          writeBlob(homeContent, recorder.generateZip(contentZipOut, compressionLevel, "blob"),
-                            this.blobContentEntryName);
+                          recorder.generateZip(contentZipOut, compressionLevel, "blob").then((blob) => {
+                            writeBlob(homeContent, blob, this.blobContentEntryName);
+                          }).catch((ex) => {
+                            console.warn("Can't extract all home data: " + ex);
+                            replaceContents();
+                          });
                         },
                         contentError: function (status, error) {
                           console.warn("Can't extract all home data: " + error);
@@ -485,9 +489,8 @@ export class HomeRecorder {
                             ZIPTools.getZIP(jarUrl, false, {
                               homeContent: this.homeContent,
                               zipReady: function (zip) {
-                                try {
-                                  let contentEntry = zip.file(contentEntryName);
-                                  let entryData = contentEntry.asUint8Array();
+                                let contentEntry = zip.file(contentEntryName);
+                                contentEntry.async("uint8array").then((entryData) => {
                                   if (ZIPTools.isPNGImage(entryData)
                                     || ZIPTools.isGIFImage(entryData)
                                     || ZIPTools.isJPEGImage(entryData)
@@ -498,8 +501,12 @@ export class HomeRecorder {
                                     let contentZipOut = new JSZip();
                                     recorder.writeZipEntry(contentZipOut, "data", this.homeContent, {
                                       contentSaved: function (homeContent) {
-                                        writeBlob(homeContent, recorder.generateZip(contentZipOut, compressionLevel, "blob"),
-                                          "data", ".extract");
+                                        recorder.generateZip(contentZipOut, compressionLevel, "blob").then((blob) => {
+                                          writeBlob(homeContent, blob, "data", ".extract");
+                                        }).catch((ex) => {
+                                          console.warn("Can't extract all home data: " + ex);
+                                          replaceContents();
+                                        });
                                       },
                                       contentError: function (status, error) {
                                         console.warn("Can't extract all home data: " + error);
@@ -507,9 +514,9 @@ export class HomeRecorder {
                                       }
                                     });
                                   }
-                                } catch (ex) {
+                                }).catch((ex) => {
                                   this.zipError(ex);
-                                }
+                                });
                               },
                               zipError: function (error) {
                                 console.warn("Can't extract all home data: " + error);
@@ -700,7 +707,7 @@ export class HomeRecorder {
         //   + "}"],
         //   { type: 'text/plain' });
         // this.writeHomeWorker = new Worker(URL.createObjectURL(blob));
-        this.writeHomeWorker = new WriteHomeWorker();
+        this.writeHomeWorker = createWriteHomeWorker();
       }
       let recorder = this;
       let workerListener = ev => {
@@ -834,7 +841,11 @@ export class HomeRecorder {
         contentSaved: function (content) {
           homeContentsCopy.splice(homeContentsCopy.lastIndexOf(content), 1);
           if (homeContentsCopy.length === 0) {
-            observer.homeSaved(homeXmlEntry, recorder.generateZip(zipOut, recorder.configuration.compressionLevel, dataType));
+            recorder.generateZip(zipOut, recorder.configuration.compressionLevel, dataType).then((data) => {
+              observer.homeSaved(homeXmlEntry, data);
+            }).catch((error) => {
+              observer.homeError(0, error);
+            });
           }
         },
         contentError: function (status, error) {
@@ -864,7 +875,11 @@ export class HomeRecorder {
         }
       }
     } else {
-      observer.homeSaved(homeXmlEntry, this.generateZip(zipOut, this.configuration.compressionLevel, dataType));
+      this.generateZip(zipOut, this.configuration.compressionLevel, dataType).then((data) => {
+        observer.homeSaved(homeXmlEntry, data);
+      }).catch((error) => {
+        observer.homeError(0, error);
+      });
     }
   }
 
@@ -879,7 +894,7 @@ export class HomeRecorder {
   generateZip(zip, compressionLevel, dataType) {
     let compression = compressionLevel !== undefined && compressionLevel === 0 ? "STORE" : "DEFLATE";
     let deflateCompressionLevel = compressionLevel !== undefined ? compressionLevel : 1;
-    return zip.generate({
+    return zip.generateAsync({
       type: dataType,
       compression: compression,
       compressionOptions: { level: deflateCompressionLevel }
@@ -1020,13 +1035,13 @@ export class HomeRecorder {
           let jarUrl = url.substring(4, entrySeparatorIndex);
           ZIPTools.getZIP(jarUrl, false, {
             zipReady: function (zip) {
-              try {
-                let contentEntry = zip.file(contentEntryName);
-                zipOut.file(entryName, contentEntry.asUint8Array(), { binary: true });
+              let contentEntry = zip.file(contentEntryName);
+              contentEntry.async("uint8array").then((entryData) => {
+                zipOut.file(entryName, entryData, { binary: true });
                 contentObserver.contentSaved(content);
-              } catch (ex) {
+              }).catch((ex) => {
                 this.zipError(ex);
-              }
+              });
             },
             zipError: function (error) {
               contentObserver.contentError(error, error.message);

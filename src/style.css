@@ -45,21 +45,28 @@ html[data-theme="light"] {
     --sh3d-list-hover: #e9ecef;
 }
 
+/* Standards mode (with <!DOCTYPE html>): % height needs html+body both set. */
 html,
 body {
+    height: 100%;
     overflow-x: hidden;
     overflow-y: hidden;
 }
 
 body {
     position       : relative;
-    margin         : 0px;
-    height         : 100%;
+    margin         : 0;
     -ms-user-select: none;
     user-select    : none;
     touch-action   : none;
     color: var(--sh3d-text);
     background: var(--sh3d-pane-bg);
+}
+
+#home-pane {
+    position: relative;
+    height: 100%;
+    min-height: 100%;
 }
 
 #home-plan::selection {
@@ -524,6 +531,16 @@ html[data-theme="light"] .toolbar {
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 }
 
+/* Override global `button { padding: 4px }` from sweethome3djs.css — that padding
+   breaks fixed 28×22 toolbar buttons in standards mode (esp. Firefox + <img>). */
+.toolbar .toolbar-button {
+    padding: 0 !important;
+    box-sizing: border-box;
+    vertical-align: top;
+    flex-shrink: 0;
+    line-height: 0;
+}
+
 html[data-theme="light"] .toolbar .toolbar-button {
     background-color: #ffffff !important;
     border-color: var(--sh3d-border) !important;
@@ -536,16 +553,28 @@ html[data-theme="light"] .toolbar .toolbar-button:hover {
     color: var(--sh3d-text) !important;
 }
 
-/* Scratchomised toolbar: larger icon + green chrome when bridge is active */
-.toolbar .scratchomised-toolbar-button img {
-    width: 20px;
-    height: 20px;
+/* Scratchomised: <img> icon must fit the 28×22 chrome without spilling onto neighbors */
+.toolbar .scratchomised-toolbar-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
+.toolbar .scratchomised-toolbar-button img {
+    width: 16px;
+    height: 16px;
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    margin: 0;
+}
+
+/* Inset ring instead of outline — outline draws outside the box and overlaps neighbors in Firefox */
 .toolbar .scratchomised-toolbar-button.scratchomised-active {
     background-color: #e8f5e9 !important;
     border-color: #2e7d32 !important;
-    outline: 1px solid #2e7d32;
+    outline: none;
+    box-shadow: inset 0 0 0 1px #2e7d32;
 }
 
 html[data-theme="light"] .toolbar .scratchomised-toolbar-button.scratchomised-active,
@@ -553,12 +582,13 @@ html[data-theme="light"] .toolbar .scratchomised-toolbar-button.scratchomised-ac
     background-color: #e8f5e9 !important;
     border-color: #2e7d32 !important;
     color: var(--sh3d-text) !important;
+    box-shadow: inset 0 0 0 1px #2e7d32;
 }
 
 html[data-theme="dark"] .toolbar .scratchomised-toolbar-button.scratchomised-active {
     background-color: rgba(46, 125, 50, 0.35) !important;
     border-color: #81c784 !important;
-    outline-color: #81c784;
+    box-shadow: inset 0 0 0 1px #81c784;
 }
 
 html[data-theme="light"] .toolbar .selected,

@@ -115,7 +115,7 @@ export class NoSuchElementException {
  * @class
  * @ignore
  */
-export let System = {}
+export const System = {}
 
 System.arraycopy = (srcPts, srcOff, dstPts, dstOff, size) => {
   if (srcPts !== dstPts
@@ -157,7 +157,7 @@ export class EventObject {
  * Adapted from java.beans.PropertyChangeEvent
  * @constructor
  */
-class PropertyChangeEvent extends EventObject {
+export class PropertyChangeEvent extends EventObject {
   constructor(source, propertyName, oldValue, newValue) {
     super(source);
     this.propertyName = propertyName;
@@ -858,7 +858,7 @@ Locale.setDefault = language => {
  * @class
  * @ignore
  */
-export let UUID = {}
+export const UUID = {}
 
 /**
  * Returns a randomly generated Universally Unique IDentifier (v4).
@@ -896,7 +896,7 @@ Math.toRadians = x => {
  * @class
  * @ignore
  */
-export let KeyStroke = {}
+export const KeyStroke = {}
 
 /**
  * Returns a string describing the key event in parameter. 

@@ -136,37 +136,39 @@ export class ContentDigestManager {
     let manager = this;
     ZIPTools.getZIP(content.isJAREntry() ? content.getJAREntryURL() : content.getURL(), false, {
       zipReady: function (zip) {
-        try {
-          let entryName = content.isJAREntry() ? content.getJAREntryName() : "";
-          let slashIndex = content instanceof HomeURLContent
-            ? entryName.indexOf('/')
-            : -1;
-          let entryDirectory = entryName.substring(0, slashIndex + 1);
-          let contentData = new Uint8Array(0);
-          let entries = slashIndex > 0 || !(content instanceof HomeURLContent)
-            ? zip.file(new RegExp("^" + entryDirectory + ".*")).sort((entry1, entry2) => { return entry1.name === entry2.name ? 0 : (entry1.name < entry2.name ? 1 : -1); }) // Reverse order
-            : [zip.file(entryName)];
+        (async () => {
+          try {
+            let entryName = content.isJAREntry() ? content.getJAREntryName() : "";
+            let slashIndex = content instanceof HomeURLContent
+              ? entryName.indexOf('/')
+              : -1;
+            let entryDirectory = entryName.substring(0, slashIndex + 1);
+            let contentData = new Uint8Array(0);
+            let entries = slashIndex > 0 || !(content instanceof HomeURLContent)
+              ? zip.file(new RegExp("^" + entryDirectory + ".*")).sort((entry1, entry2) => { return entry1.name === entry2.name ? 0 : (entry1.name < entry2.name ? 1 : -1); }) // Reverse order
+              : [zip.file(entryName)];
 
-          for (let i = entries.length - 1; i >= 0; i--) {
-            let zipEntry = entries[i];
-            if (zipEntry.name !== entryDirectory
-              && manager.isSignificant(zipEntry.name)) {
-              // Append entry data to contentData
-              let entryData = zipEntry.asUint8Array();
-              let data = new Uint8Array(contentData.length + entryData.length);
-              data.set(contentData);
-              data.set(entryData, contentData.length);
-              contentData = data;
+            for (let i = entries.length - 1; i >= 0; i--) {
+              let zipEntry = entries[i];
+              if (zipEntry.name !== entryDirectory
+                && manager.isSignificant(zipEntry.name)) {
+                // Append entry data to contentData
+                let entryData = await zipEntry.async("uint8array");
+                let data = new Uint8Array(contentData.length + entryData.length);
+                data.set(contentData);
+                data.set(entryData, contentData.length);
+                contentData = data;
+              }
             }
-          }
 
-          manager.computeContentDigest(contentData, (digest) => {
-            manager.contentDigestsCache[content.getURL()] = digest;
-            digestObserver.digestReady(content, digest);
-          });
-        } catch (ex) {
-          this.zipError(ex);
-        }
+            manager.computeContentDigest(contentData, (digest) => {
+              manager.contentDigestsCache[content.getURL()] = digest;
+              digestObserver.digestReady(content, digest);
+            });
+          } catch (ex) {
+            this.zipError(ex);
+          }
+        })();
       },
       zipError: function (error) {
         digestObserver.digestError(error, error.message);

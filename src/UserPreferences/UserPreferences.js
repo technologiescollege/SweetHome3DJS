@@ -352,8 +352,9 @@ export class UserPreferences {
    * @throws IllegalArgumentException if the given resourceFamily is not supported
    */
   getLocalizedStringKeys(resourceFamily) {
-    if (resourceClass == "DefaultFurnitureCatalog") {
+    if (resourceFamily == "DefaultFurnitureCatalog") {
       let keys = {};
+      const resourceBundles = this.furnitureCatalogResourceBundles || [];
       for (let i = 0; i < resourceBundles.length; i++) {
         if (resourceBundles[i] != null) {
           CoreTools.merge(keys, resourceBundles[i]);

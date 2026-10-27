@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import JSZip from "jszip";
+import JSZip from "../src/JSZipShim.js";
 import {
   ensureSh3xFileName,
   formatHomeOpenError,
@@ -61,15 +61,15 @@ const xml = `<?xml version='1.0'?>
 const zip = new JSZip();
 zip.file("Home.xml", xml);
 const sh3xPath = join(tmpDir, "smoke.sh3x");
-const buf = zip.generate({ type: "nodebuffer" });
+const buf = await zip.generateAsync({ type: "nodebuffer" });
 writeFileSync(sh3xPath, buf);
 assert(existsSync(sh3xPath) && buf.length > 100, `Fichier smoke.sh3x créé (${buf.length} octets)`);
 
 // --- 3. Relire le ZIP ---
-const reopened = new JSZip(readFileSync(sh3xPath));
+const reopened = await JSZip.loadAsync(readFileSync(sh3xPath));
 const entry = reopened.file("Home.xml");
 assert(entry != null, "Entrée Home.xml présente");
-const homeXml = entry.asText();
+const homeXml = await entry.async("string");
 assert(homeXml.includes("<home") && homeXml.includes("observerCamera") && homeXml.includes("<wall"), "Home.xml contient home / camera / wall");
 assert(!homeXml.includes("\uFEFF"), "Home.xml sans BOM");
 

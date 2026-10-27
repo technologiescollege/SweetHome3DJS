@@ -195,13 +195,19 @@ export class TextureManager {
       loadingTextureObserver.progression(TextureManager.READING_TEXTURE, url, 1);
 
       if (textureImage.transparent === undefined) {
+        // Always async: the response is handled in the "load" listener.
+        // (Passing `synchronous` as XHR's async flag was inverted and triggered
+        // Firefox's sync-XHR deprecation warning on the common async path.)
         let request = new XMLHttpRequest();
-        request.open("GET", url, synchronous || url.indexOf("app://") >= 0); // Always synchronized under Cordova / iOS
+        request.open("GET", url, true);
         request.addEventListener("load", () => {
           if (request.readyState === XMLHttpRequest.DONE
             && (request.status === 0 || request.status === 200)) {
             textureImage.transparent = ZIPTools.isTransparentImage(request.response);
           }
+          loadingTextureObserver.textureLoaded(textureImage);
+        });
+        request.addEventListener("error", () => {
           loadingTextureObserver.textureLoaded(textureImage);
         });
         request.send();
@@ -216,23 +222,22 @@ export class TextureManager {
       ZIPTools.getZIP(jarUrl, synchronous,
         {
           zipReady: function (zip) {
-            try {
-              textureImage.addEventListener("load", imageLoadingListener);
-              textureImage.addEventListener("error", imageErrorListener);
-              let imageEntry = zip.file(imageEntryName);
-              let imageData = imageEntry.asBinary();
+            textureImage.addEventListener("load", imageLoadingListener);
+            textureImage.addEventListener("error", imageErrorListener);
+            let imageEntry = zip.file(imageEntryName);
+            imageEntry.async("binarystring").then((imageData) => {
               let base64Image = btoa(imageData);
               // Detect quickly if the image is a PNG using transparency
               textureImage.transparent = ZIPTools.isTransparentImage(imageData);
               textureImage.src = "data:image;base64," + base64Image;
-              // If image is already here or if image loading must be synchronous 
+              // If image is already here or if image loading must be synchronous
               if (textureImage.width !== 0
                 || synchronous) {
                 imageLoadingListener();
               }
-            } catch (ex) {
+            }).catch((ex) => {
               this.zipError(ex);
-            }
+            });
           },
           zipError: function (error) {
             loadingTextureObserver.textureError("Can't load " + jarUrl);

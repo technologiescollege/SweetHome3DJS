@@ -58,7 +58,7 @@ import { Font, FontMetrics, Graphics2D } from './graphics2d';
 import { HTMLCanvas3D } from './HTMLCanvas3D';
 import { OperatingSystem } from './URLContent';
 import { ZIPTools } from './URLContent';
-import { THEME_CHANGE_EVENT } from './ThemeManager';
+import { installThemeChangeListener } from './ThemeManager';
 
 /**
  * Creates a new plan that displays <code>home</code>.
@@ -148,8 +148,7 @@ export class PlanComponent {
     this.tooltip.style.borderColor = ColorTools.toRGBAStyle(this.getForeground(), 0.7);
     this.tooltip.style.font = this.font;
     this.tooltip.style.color = this.canvas.style.color;
-    this._themeChangeListener = () => plan.applyThemeColors();
-    document.addEventListener(THEME_CHANGE_EVENT, this._themeChangeListener);
+    this._disposeThemeListener = installThemeChangeListener(() => plan.applyThemeColors());
     this.tooltip.style.zIndex = 101;
     document.body.appendChild(this.tooltip);
 
@@ -6440,6 +6439,10 @@ export class PlanComponent {
     this.container.removeEventListener("keydown", this.keyDownListener, false);
     this.container.removeEventListener("keyup", this.keyUpListener, false);
     this.container.removeEventListener("focusout", this.focusOutListener);
+    if (typeof this._disposeThemeListener === "function") {
+      this._disposeThemeListener();
+      this._disposeThemeListener = null;
+    }
     if (OperatingSystem.isInternetExplorerOrLegacyEdge()
       && window.PointerEvent) {
       window.removeEventListener("pointermove", this.mouseListener.windowPointerMoved);

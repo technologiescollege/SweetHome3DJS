@@ -6,7 +6,16 @@
  *
  * See src/scratchomised/index.js for the browser-side module map.
  */
-import type { Plugin, ViteDevServer } from "vite";
+type Plugin = {
+  name: string;
+  apply?: string;
+  configureServer?: (server: ViteDevServer) => void;
+  configurePreviewServer?: (server: unknown) => void;
+};
+type ViteDevServer = {
+  httpServer?: { once: (event: string, cb: () => void) => void } | null;
+};
+
 import { startScratchomisedBridge, DEFAULT_PORT } from "./scripts/scratchomised-bridge.mjs";
 
 type BridgeHandle = ReturnType<typeof startScratchomisedBridge>;
@@ -55,7 +64,7 @@ export function scratchomisedBridgePlugin(options: { port?: number; host?: strin
     },
     configurePreviewServer(server) {
       ensureBridge();
-      attachClose(server as unknown as ViteDevServer);
+      attachClose(server as ViteDevServer);
     },
   };
-}
+};

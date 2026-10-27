@@ -1,11 +1,12 @@
 name: Deploy to GitHub Pages
 
-# Publishes Vite dist/ to the gh-pages branch (base: /SweetHome3DJS/).
+# Builds from the `dev` branch (sole source branch) and publishes Vite dist/
+# to the orphan `gh-pages` branch (static site only).
 # Repo Settings → Pages → Source: Deploy from a branch → gh-pages / (root).
 
 on:
   push:
-    branches: [main, master]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +26,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Vite 7 requires Node ^20.19 || >=22.12
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

@@ -32,65 +32,118 @@ import { OperatingSystem, ZIPTools, } from './URLContent';
 let CoreTools = {};
 
 CoreTools.unavailableResources = [];
+/** @type {Map<string, object>} */
+CoreTools.jsonCache = new Map();
 
 /**
- * Loads a JSON resource from the given <code>url</code>. If <code>observer</code> is undefined, the request is sent synchronously
- * and the content of the <code>url</code> is returned. If it's not undefined, the request is sent asynchronously
- * and the JSON content is passed in parameter to <code>jsonLoaded</code>.
+ * Resolves a JSON URL the same way {@link CoreTools.loadJSON} does.
+ * @param {string} url
+ * @return {string}
+ */
+CoreTools.resolveJsonUrl = (url) => {
+  if (url.indexOf('/') !== 0 && url.indexOf("://") < 0) {
+    return ZIPTools.getScriptFolder() + url;
+  }
+  return url;
+};
+
+/**
+ * Prefetches resource-bundle JSON files asynchronously (no sync XHR).
+ * Call before constructing the application so sync {@link CoreTools.loadJSON}
+ * can serve from {@link CoreTools.jsonCache}.
+ * @param {string[]} bases base URLs without ".json" (relative or absolute)
+ * @param {string|null} [language] Locale.getDefault()-style language
+ * @return {Promise<void>}
+ */
+CoreTools.preloadResourceBundleBases = async (bases, language) => {
+  const urls = [];
+  for (const base of bases) {
+    if (language) {
+      urls.push(base + "_" + language + ".json");
+      if (language.indexOf("_") > 0) {
+        urls.push(base + "_" + language.split("_")[0] + ".json");
+      }
+    }
+    urls.push(base + ".json");
+  }
+  await Promise.all(urls.map((url) => new Promise((resolve) => {
+    CoreTools.loadJSON(url, {
+      jsonLoaded: () => resolve(),
+      jsonError: () => resolve(),
+    });
+  })));
+};
+
+/**
+ * Loads a JSON resource from the given <code>url</code>.
+ * Prefers {@link CoreTools.jsonCache}. Without an observer, returns the cached
+ * value (or falls back to a sync XHR only on cache miss — avoid by preloading).
+ * With an observer, loads asynchronously via <code>fetch</code>.
  * @param {string}   url  the url of the JSON resource to be loaded
- * @param {function} [observer] if present, the <code>jsonLoaded</code> method of <code>observer</code> is called 
-                         once the given <code>url</url> is loaded and its JSON content is parsed.  
+ * @param {function} [observer] if present, the <code>jsonLoaded</code> method of <code>observer</code> is called
+                         once the given <code>url</url> is loaded and its JSON content is parsed.
  * @return an object matching the loaded JSON if loaded synchronously
  */
 CoreTools.loadJSON = (url, observer) => {
-  if (url.indexOf('/') !== 0 && url.indexOf("://") < 0) {
-    // Relative URLs based on scripts folder
-    url = ZIPTools.getScriptFolder() + url;
+  url = CoreTools.resolveJsonUrl(url);
+
+  if (CoreTools.unavailableResources.indexOf(url) >= 0) {
+    if (observer !== undefined && observer.jsonError !== undefined) {
+      observer.jsonError(404, "No " + url);
+    }
+    return undefined;
   }
 
-  if (CoreTools.unavailableResources.indexOf(url) < 0) {
-    try {
-      let request = new XMLHttpRequest();
-      request.open("GET", url, observer !== undefined);
-      if (observer !== undefined) {
-        request.addEventListener("load", () => {
-          if (request.readyState === XMLHttpRequest.DONE) {
-            if (request.status === 0 || request.status === 200) {
-              try {
-                observer.jsonLoaded(JSON.parse(request.responseText));
-              } catch (ex) {
-                CoreTools.unavailableResources.push(url);
-                if (observer !== undefined
-                  && observer.jsonError !== undefined) {
-                  observer.jsonError(ex, ex.message);
-                }
-              }
-            } else if (observer.jsonError !== undefined) {
-              observer.jsonError(request.status, request.statusText);
-            }
-          }
-        });
-        request.addEventListener("error", () => {
-          CoreTools.unavailableResources.push(url);
-          if (observer.jsonError !== undefined) {
-            observer.jsonError(request.status, request.statusText);
-          }
-        });
-      }
-      request.send();
-      if (observer === undefined) {
-        return JSON.parse(request.responseText);
-      }
-    } catch (ex) {
-      CoreTools.unavailableResources.push(url);
-      if (observer !== undefined
-        && observer.jsonError !== undefined) {
-        observer.jsonError(ex, ex.message);
-      }
+  if (CoreTools.jsonCache.has(url)) {
+    const cached = CoreTools.jsonCache.get(url);
+    if (observer !== undefined) {
+      observer.jsonLoaded(cached);
+      return undefined;
     }
-  } else if (observer !== undefined
-    && observer.jsonError !== undefined) {
-    observer.jsonError(404, "No " + url);
+    return cached;
+  }
+
+  if (observer !== undefined) {
+    fetch(url, { credentials: "same-origin" }).then(async (response) => {
+      if (!(response.ok || response.status === 0)) {
+        CoreTools.unavailableResources.push(url);
+        if (observer.jsonError !== undefined) {
+          observer.jsonError(response.status, response.statusText);
+        }
+        return;
+      }
+      try {
+        const json = await response.json();
+        CoreTools.jsonCache.set(url, json);
+        observer.jsonLoaded(json);
+      } catch (ex) {
+        CoreTools.unavailableResources.push(url);
+        if (observer.jsonError !== undefined) {
+          observer.jsonError(ex, ex && ex.message ? ex.message : String(ex));
+        }
+      }
+    }).catch((ex) => {
+      CoreTools.unavailableResources.push(url);
+      if (observer.jsonError !== undefined) {
+        observer.jsonError(ex, ex && ex.message ? ex.message : String(ex));
+      }
+    });
+    return undefined;
+  }
+
+  // Sync fallback (deprecated): only used if preload missed this URL.
+  try {
+    let request = new XMLHttpRequest();
+    request.open("GET", url, false);
+    request.send();
+    if (request.status === 0 || request.status === 200) {
+      const json = JSON.parse(request.responseText);
+      CoreTools.jsonCache.set(url, json);
+      return json;
+    }
+    CoreTools.unavailableResources.push(url);
+  } catch (ex) {
+    CoreTools.unavailableResources.push(url);
   }
   return undefined;
 }
@@ -500,7 +553,7 @@ export { ColorTools };
  * @ignore
  * @author Louis Grignon
  */
-export let ImageTools = {};
+export const ImageTools = {};
 
 /**
  * @param {HTMLImageElement} image

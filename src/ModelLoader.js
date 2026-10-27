@@ -67,30 +67,32 @@ export class ModelLoader {
     let loader = this;
     const zipObserver = {
       zipReady: function (zip) {
-        try {
-          if (modelEntryName === null) {
-            // Search an entry ending with the given extension
-            let entries = zip.file(/.*/);
-            for (let i = 0; i < entries.length; i++) {
-              if (entries[i].name.toLowerCase().match(new RegExp("\." + loader.modelExtension.toLowerCase() + "$"))) {
-                loader.parseModelEntry(entries[i], zip, url, synchronous, loadingModelObserver);
+        (async () => {
+          try {
+            if (modelEntryName === null) {
+              // Search an entry ending with the given extension
+              let entries = zip.file(/.*/);
+              for (let i = 0; i < entries.length; i++) {
+                if (entries[i].name.toLowerCase().match(new RegExp("\." + loader.modelExtension.toLowerCase() + "$"))) {
+                  await loader.parseModelEntry(entries[i], zip, url, synchronous, loadingModelObserver);
+                  return;
+                }
+              }
+              if (entries.length > 0) {
+                // If not found, try with the first entry
+                modelEntryName = entries[0].name;
+              } else {
+                if (loadingModelObserver.modelError !== undefined) {
+                  loadingModelObserver.modelError("Empty file");
+                }
                 return;
               }
             }
-            if (entries.length > 0) {
-              // If not found, try with the first entry
-              modelEntryName = entries[0].name;
-            } else {
-              if (loadingModelObserver.modelError !== undefined) {
-                loadingModelObserver.modelError("Empty file");
-              }
-              return;
-            }
+            await loader.parseModelEntry(zip.file(decodeURIComponent(modelEntryName)), zip, url, synchronous, loadingModelObserver);
+          } catch (ex) {
+            zipObserver.zipError(ex);
           }
-          loader.parseModelEntry(zip.file(decodeURIComponent(modelEntryName)), zip, url, synchronous, loadingModelObserver);
-        } catch (ex) {
-          zipObserver.zipError(ex);
-        }
+        })();
       },
       zipError: function (error) {
         if (loadingModelObserver.modelError !== undefined) {
@@ -117,14 +119,14 @@ export class ModelLoader {
    * Parses the content of the given entry to create the scene it contains. 
    * @private
    */
-  parseModelEntry(modelEntry, zip, zipUrl, synchronous, loadingModelObserver) {
+  async parseModelEntry(modelEntry, zip, zipUrl, synchronous, loadingModelObserver) {
     if (synchronous) {
-      let modelContent = this.getModelContent(modelEntry);
+      let modelContent = await this.getModelContent(modelEntry);
       loadingModelObserver.progression(ModelLoader.READING_MODEL, modelEntry.name, 1);
       let modelContext = {};
-      this.parseDependencies(modelContent, modelEntry.name, zip, modelContext);
+      await this.parseDependencies(modelContent, modelEntry.name, zip, modelContext);
       let scene = this.parseEntryScene(modelContent, modelEntry.name, zip, modelContext, null, loadingModelObserver.progression);
-      this.loadTextureImages(scene, {}, zip, zipUrl, true);
+      await this.loadTextureImages(scene, {}, zip, zipUrl, true);
       loadingModelObserver.modelLoaded(scene);
     } else {
       let parsedEntry = {
@@ -149,28 +151,43 @@ export class ModelLoader {
         if (this.waitingParsedEntries.hasOwnProperty(key)) {
           const parsedEntry = this.waitingParsedEntries[key];
           const modelEntryName = parsedEntry.modelEntry.name;
-          // Get model content to parse
-          const modelContent = this.getModelContent(parsedEntry.modelEntry);
-          parsedEntry.loadingModelObserver.progression(ModelLoader.READING_MODEL, modelEntryName, 1);
-          const modelContext = {};
-          this.parseDependencies(modelContent, modelEntryName, parsedEntry.zip, modelContext);
           const loader = this;
-          // Post future work (avoid worker because the amount of data to transfer back and forth slows the program) 
-          setTimeout(
-            () => {
-              loader.parseEntryScene(modelContent, modelEntryName, parsedEntry.zip, modelContext,
-                (scene) => {
-                  loader.loadTextureImages(scene, {}, parsedEntry.zip, parsedEntry.zipUrl, true);
-                  parsedEntry.loadingModelObserver.modelLoaded(scene);
-                  loader.parserBusy = false;
-                  loader.parseNextWaitingEntry();
-                },
-                parsedEntry.loadingModelObserver.progression);
-            }, 0);
-
           this.parserBusy = true;
           // Remove parsed entry from waiting list
           delete this.waitingParsedEntries[key];
+          (async () => {
+            try {
+              const modelContent = await loader.getModelContent(parsedEntry.modelEntry);
+              parsedEntry.loadingModelObserver.progression(ModelLoader.READING_MODEL, modelEntryName, 1);
+              const modelContext = {};
+              await loader.parseDependencies(modelContent, modelEntryName, parsedEntry.zip, modelContext);
+              // Post future work (avoid worker because the amount of data to transfer back and forth slows the program)
+              setTimeout(
+                () => {
+                  loader.parseEntryScene(modelContent, modelEntryName, parsedEntry.zip, modelContext,
+                    (scene) => {
+                      loader.loadTextureImages(scene, {}, parsedEntry.zip, parsedEntry.zipUrl, true).then(() => {
+                        parsedEntry.loadingModelObserver.modelLoaded(scene);
+                        loader.parserBusy = false;
+                        loader.parseNextWaitingEntry();
+                      }).catch((ex) => {
+                        if (parsedEntry.loadingModelObserver.modelError !== undefined) {
+                          parsedEntry.loadingModelObserver.modelError(ex);
+                        }
+                        loader.parserBusy = false;
+                        loader.parseNextWaitingEntry();
+                      });
+                    },
+                    parsedEntry.loadingModelObserver.progression);
+                }, 0);
+            } catch (ex) {
+              if (parsedEntry.loadingModelObserver.modelError !== undefined) {
+                parsedEntry.loadingModelObserver.modelError(ex);
+              }
+              loader.parserBusy = false;
+              loader.parseNextWaitingEntry();
+            }
+          })();
           break;
         }
       }
@@ -181,13 +198,13 @@ export class ModelLoader {
    * Loads the textures images used by appearances of the scene.
    * @private
    */
-  loadTextureImages(node, images, zip, zipUrl, synchronous) {
+  async loadTextureImages(node, images, zip, zipUrl, synchronous) {
     if (node instanceof Group3D) {
       for (let i = 0; i < node.children.length; i++) {
-        this.loadTextureImages(node.children[i], images, zip, zipUrl, synchronous);
+        await this.loadTextureImages(node.children[i], images, zip, zipUrl, synchronous);
       }
     } else if (node instanceof Link3D) {
-      this.loadTextureImages(node.getSharedGroup(), images, zip, zipUrl, synchronous);
+      await this.loadTextureImages(node.getSharedGroup(), images, zip, zipUrl, synchronous);
     } else if (node instanceof Shape3D) {
       let appearance = node.getAppearance();
       if (appearance) {
@@ -204,10 +221,10 @@ export class ModelLoader {
             // Store loaded image to avoid duplicates
             images[imageEntryName] = image;
 
-            let loader = () => {
+            let loader = async () => {
               let imageEntry = zip.file(decodeURIComponent(imageEntryName));
               if (imageEntry !== null) {
-                let imageData = imageEntry.asBinary();
+                let imageData = await imageEntry.async("binarystring");
                 let base64Image = btoa(imageData);
                 let extension = imageEntryName.substring(imageEntryName.lastIndexOf('.') + 1).toLowerCase();
                 let mimeType = ZIPTools.isJPEGImage(imageData)
@@ -223,9 +240,9 @@ export class ModelLoader {
               }
             };
             if (synchronous) {
-              loader();
+              await loader();
             } else {
-              setTimeout(loader, 0);
+              setTimeout(() => { loader(); }, 0);
             }
           }
         }
@@ -237,15 +254,15 @@ export class ModelLoader {
    * Returns the content of the model stored in the given entry.
    * @protected
    */
-  getModelContent(modelEntry) {
-    return modelEntry.asBinary();
+  async getModelContent(modelEntry) {
+    return modelEntry.async("binarystring");
   }
 
   /**
    * Parses the dependencies of the model content if any and returns the materials it describes.
    * @protected
    */
-  parseDependencies(modelContent, modelEntryName, zip, modelContext) {
+  async parseDependencies(modelContent, modelEntryName, zip, modelContext) {
   }
 
   /**

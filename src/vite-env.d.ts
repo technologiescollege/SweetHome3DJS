@@ -12,4 +12,6 @@ declare const java: {
 /**
  * @deprecated
  */
-declare const PropertyChangeListener: any;
+interface PropertyChangeListener {
+    propertyChange(evt: any): void;
+}

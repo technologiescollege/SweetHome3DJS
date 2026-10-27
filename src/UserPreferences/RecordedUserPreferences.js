@@ -23,10 +23,9 @@ import {
 import { UserPreferences } from './UserPreferences';
 import { DefaultUserPreferences } from './DefaultUserPreferences';
 import {
-  applyThemePreference,
-  getStoredThemePreference,
-  normalizeThemePreference,
-} from '../ThemeManager';
+  applyRecordedUiTheme,
+  bindUiThemePropertyPersistence,
+} from '../PreferencesThemeUI.js';
 import { loadUserFurnitureLibraries } from '../LocalFurnitureLibraryImport';
 
 export class RecordedUserPreferences extends UserPreferences {
@@ -160,11 +159,10 @@ export class RecordedUserPreferences extends UserPreferences {
   updatePreferencesFromProperties(properties, defaultUserLanguage, updateCatalogs) {
     this.setLanguage(this.getProperty(properties, RecordedUserPreferences.LANGUAGE, defaultUserLanguage));
 
-    const themeFromPrefs = this.getProperty(properties, RecordedUserPreferences.UI_THEME, null);
-    const uiTheme = normalizeThemePreference(
-      themeFromPrefs != null ? themeFromPrefs : getStoredThemePreference());
-    this.setUiTheme(uiTheme);
-    applyThemePreference(uiTheme);
+    applyRecordedUiTheme(
+      this,
+      this.getProperty(properties, RecordedUserPreferences.UI_THEME, null)
+    );
 
     // Read default furniture and textures catalog
     if (updateCatalogs) {
@@ -305,9 +303,7 @@ export class RecordedUserPreferences extends UserPreferences {
       let writtenProperty = writtenProperties[i];
       this.addPropertyChangeListener(writtenProperty, savedPropertyListener);
     }
-    this.addPropertyChangeListener("UI_THEME", (ev) => {
-      applyThemePreference(ev.getNewValue());
-    });
+    bindUiThemePropertyPersistence(this);
     this.getTexturesCatalog().addTexturesListener(savedPropertyListener);
   }
 
@@ -826,7 +822,7 @@ export class RecordedUserPreferences extends UserPreferences {
                       preferences.writeResource(textureImage, textureImageFileName + imageExtension, index, loadListener);
                     },
                     blobError: function (status, error) {
-                      contentsObserver.resourcesError(status, error);
+                      console.log("Can't write texture resource " + status + " " + error);
                     }
                   });
                 }

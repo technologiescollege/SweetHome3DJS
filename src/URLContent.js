@@ -17,13 +17,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA02111-1307USA
  */
-import JSZip from 'jszip';
+import JSZip from './JSZipShim.js';
 
 import {
   IllegalStateException,
   UnsupportedOperationException,
 } from './core';
 import { CoreTools } from './CoreTools';
+import { getLibFolderUrl } from './LocalAppBase.js';
 
 /**
  * Content wrapper for strings used as URLs.
@@ -796,7 +797,7 @@ IndexedDBURLContent.INDEXED_DB_PREFIX = "indexeddb://";
  * @ignore
  * @author Emmanuel Puybaret
  */
-export let OperatingSystem = {}
+export const OperatingSystem = {}
 
 /**
  * Returns <code>true</code> if the operating system is Linux.
@@ -868,7 +869,7 @@ OperatingSystem.isInternetExplorer = () => {
  * @class
  * @author Emmanuel Puybaret
  */
-export let ZIPTools = {};
+export const ZIPTools = {};
 
 ZIPTools.READING = "Reading";
 
@@ -910,14 +911,13 @@ ZIPTools.getZIP = (url, synchronous, zipObserver) => {
               if (request.readyState === XMLHttpRequest.DONE) {
                 if ((request.status === 200 || request.status === 0)
                   && request.response != null) {
-                  try {
-                    ZIPTools.runningRequests.splice(ZIPTools.runningRequests.indexOf(request), 1);
-                    let zip = new JSZip(request.response);
+                  ZIPTools.runningRequests.splice(ZIPTools.runningRequests.indexOf(request), 1);
+                  JSZip.loadAsync(request.response).then((zip) => {
                     ZIPTools.openedZips[url] = zip;
                     zipObserver.zipReady(ZIPTools.openedZips[url]);
-                  } catch (ex) {
+                  }).catch((ex) => {
                     zipObserver.zipError(ex);
-                  }
+                  });
                 } else {
                   // Report error for requests that weren't aborted
                   let index = ZIPTools.runningRequests.indexOf(request);
@@ -1105,33 +1105,10 @@ ZIPTools.isTransparentImage = imageData => {
 }
 
 /**
- * Returns the folder of static SH3D assets (`lib/`), relative to the app base URL.
- * Respecte la base Vite (ex. `/SweetHome3DJS/` en preview/prod) pour éviter les 404
- * sur `lib/resources/*.json`.
+ * Returns the folder of static SH3D assets (`lib/`).
+ * Base path resolution lives in LocalAppBase.js (Vite BASE_URL).
  * @param {string|RegExp} [script] unused (compat API)
  * @package
  * @ignore
  */
-ZIPTools.getScriptFolder = () => {
-  let basePath = "/";
-  try {
-    // Vite injecte import.meta.env.BASE_URL (ex. "/" ou "/SweetHome3DJS/")
-    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.BASE_URL) {
-      basePath = String(import.meta.env.BASE_URL);
-    } else {
-      let path = window.location.pathname || "/";
-      if (/\.html?$/i.test(path)) {
-        path = path.substring(0, path.lastIndexOf("/") + 1);
-      } else if (!path.endsWith("/")) {
-        path = path.substring(0, path.lastIndexOf("/") + 1) || "/";
-      }
-      basePath = path;
-    }
-  } catch (_) {
-    basePath = "/";
-  }
-  if (!basePath.endsWith("/")) {
-    basePath += "/";
-  }
-  return new URL(basePath + "lib/", window.location.origin).toString();
-}
+ZIPTools.getScriptFolder = () => getLibFolderUrl();

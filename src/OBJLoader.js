@@ -1122,7 +1122,7 @@ export class OBJLoader extends ModelLoader {
    * of <code>modelContext</code>.
    * @protected
    */
-  parseDependencies(objContent, objEntryName, zip, modelContext) {
+  async parseDependencies(objContent, objEntryName, zip, modelContext) {
     modelContext.appearances = {};
     for (let k in OBJLoader.defaultAppearances) {
       let appearance = OBJLoader.defaultAppearances[k];
@@ -1140,7 +1140,7 @@ export class OBJLoader extends ModelLoader {
         }
         let line = objContent.substring(mtllibIndex, endOfLine).trim();
         let mtllib = line.substring(7, line.length).trim();
-        this.parseMaterialEntry(mtllib, modelContext.appearances, objEntryName, zip);
+        await this.parseMaterialEntry(mtllib, modelContext.appearances, objEntryName, zip);
 
         mtllibIndex = objContent.indexOf("mtllib", endOfLine);
       }
@@ -1405,14 +1405,14 @@ export class OBJLoader extends ModelLoader {
    * Parses appearances from the given material entry, then returns true if the given entry exists.
    * @private
    */
-  parseMaterialEntry(mtlEntryName, appearances, objEntryName, zip) {
+  async parseMaterialEntry(mtlEntryName, appearances, objEntryName, zip) {
     let lastSlash = objEntryName.lastIndexOf("/");
     if (lastSlash >= 0) {
       mtlEntryName = objEntryName.substring(0, lastSlash + 1) + mtlEntryName;
     }
     let mtlEntry = zip.file(mtlEntryName);
     if (mtlEntry !== null) {
-      OBJLoader.parseMaterial(mtlEntry.asBinary(), appearances, objEntryName, zip);
+      OBJLoader.parseMaterial(await mtlEntry.async("binarystring"), appearances, objEntryName, zip);
     }
   }
 

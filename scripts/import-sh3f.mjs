@@ -23,7 +23,7 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import JSZip from "jszip";
+import JSZip from "../src/JSZipShim.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -223,7 +223,7 @@ function rewriteCatalogPaths(props, zipFiles, publicZipRel) {
  * Si c'est déjà un .sh3f (PluginFurnitureCatalog.properties), le laisse tel quel.
  */
 async function unwrapSh3fIfNeeded(buffer, destZip, sourceName) {
-  const zip = new JSZip(buffer);
+  const zip = await JSZip.loadAsync(buffer);
   const names = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
   const hasCatalog = names.some((n) =>
     /(^|\/)PluginFurnitureCatalog\.properties$/i.test(n)
@@ -245,7 +245,7 @@ async function unwrapSh3fIfNeeded(buffer, destZip, sourceName) {
   }
   const entry = sh3fEntries[0];
   console.log(`Extraction du .sh3f interne: ${entry}`);
-  const inner = zip.file(entry).asNodeBuffer();
+  const inner = await zip.file(entry).async("nodebuffer");
   await writeFile(destZip, inner);
   return inner;
 }
@@ -287,8 +287,8 @@ function listPropertyFiles(zip) {
  * Les .properties Java historiques sont en ISO-8859-1 (latin1), avec éventuellement
  * des escapes \uXXXX. asText() de JSZip décode en UTF-8 et casse les accents (é → �).
  */
-function readPropertiesText(zipFile) {
-  const bytes = zipFile.asUint8Array();
+async function readPropertiesText(zipFile) {
+  const bytes = await zipFile.async("uint8array");
   return new TextDecoder("latin1").decode(bytes);
 }
 
@@ -330,7 +330,7 @@ async function main() {
   buffer = await unwrapSh3fIfNeeded(buffer, destZip, sourceName);
   console.log(`SH3F enregistré: public/${publicZipRel} (${buffer.length} octets)`);
 
-  const zip = new JSZip(buffer);
+  const zip = await JSZip.loadAsync(buffer);
   const propertyFiles = listPropertyFiles(zip);
   if (propertyFiles.length === 0) {
     throw new Error("Aucun PluginFurnitureCatalog*.properties trouvé dans le .sh3f");
@@ -338,7 +338,7 @@ async function main() {
 
   let pieceCount = 0;
   for (const propPath of propertyFiles) {
-    const text = readPropertiesText(zip.file(propPath));
+    const text = await readPropertiesText(zip.file(propPath));
     const parsed = parseProperties(text);
     const { props, rewritten, missing } = rewriteCatalogPaths(
       parsed,
